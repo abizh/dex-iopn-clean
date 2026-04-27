@@ -1,14 +1,14 @@
-// ==========================================================
+// 
 // STABLE API (SELF-CONTAINED, NO IMPORT DEPENDENCY)
-// ==========================================================
+// 
 
-// ===== AMM =====
+//  AMM 
 function getAmountOut(amountIn, reserveIn, reserveOut, fee = 0.003) {
   const amountInWithFee = amountIn * (1 - fee);
   return (amountInWithFee * reserveOut) / (reserveIn + amountInWithFee);
 }
 
-// ===== SIMULASI =====
+// SIMULASI
 function simulatePath(path, tokenIn, amountIn) {
   let amount = amountIn;
   let current = tokenIn;
@@ -35,7 +35,7 @@ function simulatePath(path, tokenIn, amountIn) {
   return amount;
 }
 
-// ===== PATH FINDER =====
+// PATH FINDER
 function findAllPaths(pools, start, end, maxHops = 3) {
   const results = [];
 
@@ -69,7 +69,7 @@ function findAllPaths(pools, start, end, maxHops = 3) {
   return results;
 }
 
-// ===== SOLVER =====
+// SOLVER
 function solveRoute(pools, tokenIn, tokenOut, amountIn) {
   const paths = findAllPaths(pools, tokenIn, tokenOut);
 
@@ -86,15 +86,15 @@ function solveRoute(pools, tokenIn, tokenOut, amountIn) {
   return best;
 }
 
-// ===== HANDLER =====
+// HANDLER
 export default function handler(req, res) {
   try {
-    // ===== SAFE INPUT =====
+    // SAFE INPUT 
     const tokenIn = "OPN";
     const tokenOut = "OPNT";
     const amount = 10;
 
-    // ===== POOLS (FINAL CALIBRATION) =====
+    //  POOLS (FINAL CALIBRATION) 
     const pools = [
       { id: "OPN-WOPN", token0: "OPN", token1: "WOPN", reserve0: 800, reserve1: 800, fee: 0.003 },
       { id: "WOPN-OPNT", token0: "WOPN", token1: "OPNT", reserve0: 800, reserve1: 900, fee: 0.003 },
