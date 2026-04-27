@@ -17,7 +17,6 @@ const EXECUTOR_ABI = [
 async function connectWallet() {
   let ethProvider = null;
 
-  // 🔍 DETECT MULTI WALLET
   if (window.ethereum) {
     ethProvider = window.ethereum;
   } else if (window.okxwallet) {
@@ -27,24 +26,33 @@ async function connectWallet() {
   }
 
   if (!ethProvider) {
-    alert("Wallet tidak terdeteksi. Gunakan MetaMask / Trust / OKX Wallet DApp Browser");
+    alert("Wallet tidak ditemukan");
     return;
   }
 
   try {
+    // 🔥 METHOD UNIVERSAL
+    const accounts = await ethProvider.request({
+      method: "eth_requestAccounts"
+    });
+
+    const address = accounts[0];
+
     const provider = new ethers.providers.Web3Provider(ethProvider);
-
-    await provider.send("eth_requestAccounts", []);
-
     const signer = provider.getSigner();
-    const address = await signer.getAddress();
 
     document.getElementById("wallet").innerText =
       address.slice(0, 6) + "..." + address.slice(-4);
 
   } catch (err) {
-    console.error(err);
-    alert("Wallet terdeteksi tapi gagal konek (cek permission / jaringan)");
+    console.error("CONNECT ERROR:", err);
+
+    // 🔥 DETAIL ERROR
+    if (err.code === 4001) {
+      alert("User menolak koneksi wallet");
+    } else {
+      alert("Gagal konek wallet: " + err.message);
+    }
   }
 }
 
