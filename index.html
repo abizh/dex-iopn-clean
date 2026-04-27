@@ -1,88 +1,72 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DEX ROUTE OPTIMIZER</title>
-
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>DEX ROUTE OPTIMIZER (PHASE 1)</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #0b0f14;
+      color: #e6edf3;
+      padding: 20px;
+    }
+    .card {
+      background: #111827;
+      padding: 16px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+    .btn {
+      padding: 10px;
+      background: #2563eb;
+      border: none;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+    }
+  </style>
 </head>
 
-<body class="bg-slate-900 text-white flex items-center justify-center h-screen">
+<body>
 
-  <div class="bg-slate-800 p-6 rounded-xl w-full max-w-md shadow-lg">
+<div class="card">
+  <h2>DEX ROUTE OPTIMIZER (PHASE 1)</h2>
 
-    <h1 class="text-xl font-bold mb-4 text-center">
-      DEX ROUTE OPTIMIZER (PHASE 1)
-    </h1>
+  <input id="amount" type="number" value="1" />
 
-    <!-- INPUT -->
-    <input 
-      id="amountIn"
-      type="number"
-      value="1"
-      class="w-full p-3 rounded bg-slate-700 text-white mb-4"
-    />
+  <button class="btn" onclick="runOptimizer()">RUN ROUTE OPTIMIZER</button>
+</div>
 
-    <!-- BUTTON -->
-    <button 
-      onclick="runOptimizer()"
-      class="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded font-bold"
-    >
-      RUN ROUTE OPTIMIZER
-    </button>
+<div class="card" id="result">
+  <h3>Best Route</h3>
+  <div id="route"></div>
+  <h3>Output</h3>
+  <div id="output"></div>
+</div>
 
-    <!-- RESULT -->
-    <div id="result" class="mt-6 hidden bg-slate-700 p-4 rounded">
-      <div class="text-sm text-slate-400">Best Route</div>
-      <div id="route" class="text-blue-400 font-bold mt-1"></div>
+<script>
+async function runOptimizer() {
+  const amount = Number(document.getElementById("amount").value);
 
-      <div class="flex justify-between mt-2">
-        <span>Output</span>
-        <span id="output" class="text-green-400"></span>
-      </div>
-    </div>
+  const res = await fetch("/api/route", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tokenIn: "OPN",
+      tokenOut: "OPNT",
+      amount
+    })
+  });
 
-  </div>
+  const data = await res.json();
 
-  <!-- SCRIPT HARUS DI SINI -->
-  <script>
-    async function runOptimizer() {
-      const btn = event.target;
-      btn.innerText = "Processing...";
-      btn.disabled = true;
+  document.getElementById("route").innerText =
+    data.route.map(r => r.pool).join(" → ");
 
-      try {
-        const amount = document.getElementById("amountIn").value;
-
-        const res = await fetch("/api/route", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tokenIn: "OPN",
-            tokenOut: "OPNT",
-            amount: Number(amount)
-          })
-        });
-
-        const data = await res.json();
-
-        document.getElementById("result").classList.remove("hidden");
-        document.getElementById("route").innerText =
-          data.route.map(r => r.pool).join(" → ");
-
-        document.getElementById("output").innerText =
-          data.expectedOut;
-
-      } catch (err) {
-        alert("API ERROR / NOT CONNECTED");
-      }
-
-      btn.innerText = "RUN ROUTE OPTIMIZER";
-      btn.disabled = false;
-    }
-  </script>
+  document.getElementById("output").innerText =
+    data.expectedOut;
+}
+</script>
 
 </body>
 </html>
-	
