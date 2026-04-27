@@ -1,35 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DEX ROUTE OPTIMIZER</title>
+  <style>
+    body { background:#0b0f14; color:white; font-family:sans-serif; padding:20px; line-height:1.6; }
+    h2 { color:#00d4ff; border-bottom: 1px solid #333; padding-bottom:10px; }
+    input { background:#1a1f26; border:1px solid #444; color:white; padding:10px; border-radius:5px; width:100%; max-width:200px; margin-bottom:15px; }
+    button { padding:12px 20px; cursor:pointer; border:none; border-radius:5px; font-weight:bold; transition: 0.3s; margin-bottom: 10px; }
+    .btn-connect { background:#ffffff; color:#000; width: 100%; max-width:220px; }
+    .btn-simulate { background:#28a745; color:white; }
+    .btn-execute { background:#007bff; color:white; }
+    #wallet { color:#888; font-family:monospace; margin-bottom:20px; }
+    .status-box { background:#161b22; border:1px solid #30363d; padding:15px; border-radius:6px; margin-top:10px; }
+  </style>
 </head>
 
-<body style="background:#0b0f14;color:white;font-family:sans-serif;padding:20px">
+<body>
 
   <h2>DEX ROUTE OPTIMIZER (PHASE 1)</h2>
 
+  <label>Amount In:</label><br>
   <input id="amountIn" type="number" value="10" />
 
-  <br><br>
+  <br>
 
-  <button onclick="connectWallet()">CONNECT WALLET</button>
-  <div id="wallet">Not Connected</div>
+  <button id="btnConnect" class="btn-connect" onclick="connectWallet()">CONNECT WALLET</button>
+  <div id="wallet">Status: Not Connected</div>
 
-  <br><br>
+  <div style="display:flex; gap:10px;">
+    <button class="btn-simulate" onclick="simulateExecution()">SIMULATE</button>
+    <button class="btn-execute" onclick="executeSwap()">EXECUTE (REAL)</button>
+  </div>
 
-  <button onclick="simulateExecution()">SIMULATE</button>
-  <button onclick="executeSwap()">EXECUTE (REAL)</button>
+  <div class="status-box">
+    <strong>Best Route:</strong>
+    <div id="route" style="color:#00ff00;">-</div>
+  </div>
 
-  <h3>Best Route</h3>
-  <div id="route">-</div>
+  <div class="status-box">
+    <strong>Output Log:</strong>
+    <div id="output" style="font-family:monospace; font-size:12px; color:#abb2bf;">-</div>
+  </div>
 
-  <h3>Output</h3>
-  <div id="output">-</div>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 
-  <!-- 🔥 LOAD ETHERS DULU (WAJIB DI ATAS app.js) -->
-  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  <script>
+    async function connectWallet() {
+      if (typeof window.ethereum !== 'undefined') {
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          const account = accounts[0];
+          
+          document.getElementById('wallet').innerText = "Status: Connected (" + account.substring(0,6) + "..." + account.substring(38) + ")";
+          document.getElementById('btnConnect').innerText = "WALLET CONNECTED";
+          document.getElementById('btnConnect').disabled = true;
+          document.getElementById('btnConnect').style.opacity = "0.5";
 
-  <!-- 🔥 BARU LOAD APP -->
+          // Global Provider & Signer for app.js
+          window.provider = new ethers.providers.Web3Provider(window.ethereum);
+          window.signer = window.provider.getSigner();
+          
+          console.log("SOP Check: Wallet Linked Successfully");
+        } catch (err) {
+          console.error("Connection Error:", err);
+          document.getElementById('output').innerText = "Error: " + err.message;
+        }
+      } else {
+        alert("Wallet Not Detected. Please use a Web3 Browser.");
+      }
+    }
+  </script>
+
   <script src="app.js"></script>
 
 </body>
