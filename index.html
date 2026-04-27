@@ -12,16 +12,13 @@
 
   <br><br>
 
- <button onclick="connectWallet()">CONNECT WALLET</button>
-<div id="wallet">Not Connected</div>
+  <button onclick="connectWallet()">CONNECT WALLET</button>
+  <div id="wallet">Not Connected</div>
 
-<br><br>
+  <br><br>
 
-<button onclick="simulateExecution()">SIMULATE</button>
-<button onclick="executeSwap()">EXECUTE (REAL)</button>
-
-<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
-  </button>
+  <button onclick="simulateExecution()">SIMULATE</button>
+  <button onclick="executeSwap()">EXECUTE (REAL)</button>
 
   <h3>Best Route</h3>
   <div id="route">-</div>
@@ -29,7 +26,10 @@
   <h3>Output</h3>
   <div id="output">-</div>
 
-  <!-- WAJIB: load app.js -->
+  <!-- 🔥 LOAD ETHERS DULU (WAJIB DI ATAS app.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+
+  <!-- 🔥 BARU LOAD APP -->
   <script src="app.js"></script>
 
 </body>
