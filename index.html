@@ -61,7 +61,7 @@ async function runOptimizer() {
   const data = await res.json();
 
   document.getElementById("route").innerText =
-    data.route.map(r => r.pool).join(" → ");
+    data.route.map(r => r.poolId).join(" → ");
 
   document.getElementById("output").innerText =
     data.expectedOut;
@@ -70,3 +70,6 @@ async function runOptimizer() {
 
 </body>
 </html>
+				
+			
+				
