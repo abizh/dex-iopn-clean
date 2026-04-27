@@ -1,9 +1,24 @@
 import { solveRoute } from "../lib/solver.js";
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   try {
-    const { tokenIn, tokenOut, amount } = req.body;
+    // ===== HANDLE BODY SAFE =====
+    let body = {};
 
+    if (req.method === "POST") {
+      try {
+        body = req.body || {};
+      } catch {
+        body = {};
+      }
+    }
+
+    // fallback kalau GET / kosong
+    const tokenIn = body.tokenIn || "OPN";
+    const tokenOut = body.tokenOut || "OPNT";
+    const amount = Number(body.amount || 10);
+
+    // ===== POOLS =====
     const pools = [
       {
         id: "OPN-WOPN",
@@ -49,7 +64,7 @@ export default function handler(req, res) {
 
     const result = solveRoute(pools, tokenIn, tokenOut, amount);
 
-    // ===== GUARD (INI KUNCI FIX) =====
+    // ===== SAFE RESPONSE =====
     if (!result || !result.path || result.path.length === 0) {
       return res.status(200).json({
         route: ["NO_ROUTE"],
