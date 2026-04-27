@@ -12,8 +12,15 @@
 
   <br><br>
 
-  <button onclick="runOptimizer()">
-    RUN ROUTE OPTIMIZER
+ <button onclick="connectWallet()">CONNECT WALLET</button>
+<div id="wallet">Not Connected</div>
+
+<br><br>
+
+<button onclick="simulateExecution()">SIMULATE</button>
+<button onclick="executeSwap()">EXECUTE (REAL)</button>
+
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
   </button>
 
   <h3>Best Route</h3>
