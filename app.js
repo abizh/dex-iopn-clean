@@ -15,19 +15,25 @@ const EXECUTOR_ABI = [
 
 // ===== CONNECT WALLET =====
 async function connectWallet() {
-  if (!window.ethereum) {
-    alert("Install MetaMask");
+  if (typeof window.ethereum === "undefined") {
+    alert("Wallet tidak ditemukan (install MetaMask / gunakan browser wallet)");
     return;
   }
 
-  provider = new ethers.providers.Web3Provider(window.ethereum);
-  await provider.send("eth_requestAccounts", []);
+  try {
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
 
-  signer = provider.getSigner();
-  userAddress = await signer.getAddress();
+    const signer = provider.getSigner();
+    const address = await signer.getAddress();
 
-  document.getElementById("wallet").innerText =
-    userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
+    document.getElementById("wallet").innerText =
+      address.slice(0, 6) + "..." + address.slice(-4);
+
+  } catch (err) {
+    console.error(err);
+    alert("Gagal connect wallet");
+  }
 }
 
 // ===== FETCH ROUTE =====
