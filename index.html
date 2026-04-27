@@ -1,74 +1,29 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>DEX ROUTE OPTIMIZER (PHASE 1)</title>
-  <style>
-    body {
-      font-family: Arial;
-      background: #0b0f14;
-      color: #e6edf3;
-      padding: 20px;
-    }
-    .card {
-      background: #111827;
-      padding: 16px;
-      border-radius: 10px;
-      margin-bottom: 12px;
-    }
-    .btn {
-      padding: 10px;
-      background: #2563eb;
-      border: none;
-      color: white;
-      border-radius: 8px;
-      cursor: pointer;
-      width: 100%;
-    }
-  </style>
+  <title>DEX ROUTE OPTIMIZER</title>
 </head>
 
-<body>
+<body style="background:#0b0f14;color:white;font-family:sans-serif;padding:20px">
 
-<div class="card">
   <h2>DEX ROUTE OPTIMIZER (PHASE 1)</h2>
 
- <input id="amountIn" type="number" value="10" />
-<button onclick="runOptimizer()">RUN ROUTE OPTIMIZER</button>
+  <input id="amountIn" type="number" value="10" />
 
-<div id="result"></div>
+  <br><br>
 
-<script src="app.js"></script>
-</div>
+  <button onclick="runOptimizer()">
+    RUN ROUTE OPTIMIZER
+  </button>
 
-<div class="card" id="result">
   <h3>Best Route</h3>
-  <div id="route"></div>
+  <div id="route">-</div>
+
   <h3>Output</h3>
-  <div id="output"></div>
-</div>
+  <div id="output">-</div>
 
-<script>
-async function runOptimizer() {
-  const amount = Number(document.getElementById("amount").value);
-
-  const res = await fetch("/api/route", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      tokenIn: "OPN",
-      tokenOut: "OPNT",
-      amount
-    })
-  });
-
-  const data = await res.json();
-
-  document.getElementById("route").innerText =
-    data.route.map(r => r.poolId).join(" → ");
-
-  document.getElementById("output").innerText =                                             data.expectedOut;
-}
-</script>
+  <!-- WAJIB: load app.js -->
+  <script src="app.js"></script>
 
 </body>
 </html>
