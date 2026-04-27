@@ -1,51 +1,87 @@
-<!DOCTYPE html>
+kk<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DEX Route Optimizer</title>
+  <title>DEX ROUTE OPTIMIZER</title>
+
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-slate-900 text-white font-sans p-6">
+<body class="bg-slate-900 text-white flex items-center justify-center h-screen">
 
-  <div class="max-w-md mx-auto bg-slate-800 rounded-xl p-6 shadow-lg">
+  <div class="bg-slate-800 p-6 rounded-xl w-full max-w-md shadow-lg">
 
-    <h1 class="text-xl font-bold mb-4 border-b border-slate-600 pb-2">
+    <h1 class="text-xl font-bold mb-4 text-center">
       DEX ROUTE OPTIMIZER (PHASE 1)
     </h1>
 
-    <div class="space-y-4">
-      <input type="number" value="1"
-        class="w-full p-2 rounded bg-slate-700 border border-slate-600">
+    <!-- INPUT -->
+    <input 
+      id="amountIn"
+      type="number"
+      value="1"
+      class="w-full p-3 rounded bg-slate-700 text-white mb-4"
+    />
 
-      <button onclick="runOptimizer()" class="w-full bg-blue-600 p-2 rounded">
-  RUN ROUTE OPTIMIZER
-</button>
+    <!-- BUTTON -->
+    <button 
+      onclick="runOptimizer()"
+      class="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded font-bold"
+    >
+      RUN ROUTE OPTIMIZER
+    </button>
+
+    <!-- RESULT -->
+    <div id="result" class="mt-6 hidden bg-slate-700 p-4 rounded">
+      <div class="text-sm text-slate-400">Best Route</div>
+      <div id="route" class="text-blue-400 font-bold mt-1"></div>
+
+      <div class="flex justify-between mt-2">
+        <span>Output</span>
+        <span id="output" class="text-green-400"></span>
+      </div>
     </div>
 
   </div>
 
-</body <script>
-async function runOptimizer() {
-  const res = await fetch("/api/route", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      tokenIn: "OPN",
-      tokenOut: "OPNT",
-      amount: 1
-    })
-  });
+  <!-- SCRIPT HARUS DI SINI -->
+  <script>
+    async function runOptimizer() {
+      const btn = event.target;
+      btn.innerText = "Processing...";
+      btn.disabled = true;
 
-  const data = await res.json();
+      try {
+        const amount = document.getElementById("amountIn").value;
 
-  alert(
-    "Route: " + data.route.map(r => r.pool).join(" → ") +
-    "\nOutput: " + data.expectedOut
-  );
-}
-</script>
+        const res = await fetch("/api/route", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tokenIn: "OPN",
+            tokenOut: "OPNT",
+            amount: Number(amount)
+          })
+        });
+
+        const data = await res.json();
+
+        document.getElementById("result").classList.remove("hidden");
+        document.getElementById("route").innerText =
+          data.route.map(r => r.pool).join(" → ");
+
+        document.getElementById("output").innerText =
+          data.expectedOut;
+
+      } catch (err) {
+        alert("API ERROR / NOT CONNECTED");
+      }
+
+      btn.innerText = "RUN ROUTE OPTIMIZER";
+      btn.disabled = false;
+    }
+  </script>
+
+</body>
 </html>
