@@ -1,143 +1,238 @@
 /**
- * GOLD OPTIMIZER — MASTER APP.JS (V1.3.0)
- * Status: PRIVATE POOL MODE | SOP: Ultra Precision
- * Executor: 0x7253EFaaeca3DdA533d2646fb21e9d50142D601f
+ * GOLD OPTIMIZER — MASTER APP.JS (V1.4.0 FINAL)
+ * Status: STABLE HANDSHAKE + EXECUTOR LIVE READY
  */
 
-// --- SYARAT 1: DEX_CONFIG (Pusat Data & Checksum) ---
-const DEX_CONFIG = {
-    TOKENS: {
-        "WOPN":  { symbol: "WOPN",  price: 1.25, address: ethers.utils.getAddress("0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84") },
-        "OPNT":  { symbol: "OPNT",  price: 1.15, address: ethers.utils.getAddress("0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d") },
-        "TETE":  { symbol: "TETE",  price: 0.05, address: ethers.utils.getAddress("0x771699B159F5DEC9608736DC9C6c901Ddb7Afe3E") },
-        "tUSDT": { symbol: "tUSDT", price: 1.0,  address: ethers.utils.getAddress("0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b") }
-    },
-    // SYARAT 3: Pool Validation (Menggunakan Alamat Kontrak Sendiri sebagai Pool Sementara)
-    POOLS: {
-        "SIMULATION_POOL": ethers.utils.getAddress("0x7253EFaaeca3DdA533d2646fb21e9d50142D601f")
-    }
-};
-
-// SYARAT 2: EXECUTOR_ADDR (Identitas Kontrak Kamu)
+// =============================
+// CONFIG
+// =============================
 const EXECUTOR_ADDR = ethers.utils.getAddress("0x7253EFaaeca3DdA533d2646fb21e9d50142D601f");
 
 const EXECUTOR_ABI = [
-    "function executeRoute(address[] pools, address[] path, uint256 amountIn, uint256 minOut) returns (uint256)"
+  "function executeRoute(address[] pools,address[] path,uint256 amountIn,uint256 minOut) returns (uint256)"
 ];
 
-// --- CORE SYSTEM ENGINE ---
-window.initEngine = function () {
-    console.log("SOP: Booting Executor Engine V1.3.0...");
-    
-    // Sync Global State
-    if (!window.wallet) window.wallet = {};
-    window.wallet.address = window.userAddress;
-    window.wallet.provider = window.provider;
-    window.wallet.signer = window.provider?.getSigner();
+const DEX_CONFIG = {
+  TOKENS: {
+    WOPN:  { price: 1.25, address: ethers.utils.getAddress("0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84") },
+    OPNT:  { price: 1.15, address: ethers.utils.getAddress("0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d") },
+    TETE:  { price: 0.05, address: ethers.utils.getAddress("0x771699B159F5DEC9608736DC9C6c901Ddb7Afe3E") },
+    tUSDT: { price: 1.0,  address: ethers.utils.getAddress("0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b") }
+  },
 
-    fetchBalances();
-    setupEventListeners();
-    simulateExecution();
-    
-    updateSystem("> SYSTEM: Private Pool Mode Active. Ready.");
+  // ⚠️ GANTI DENGAN POOL REAL
+  POOLS: {
+    WOPN_OPNT: "ISI_POOL_REAL_DISINI"
+  }
 };
 
+// =============================
+// GLOBAL STATE
+// =============================
+window.wallet = {
+  address: null,
+  provider: null,
+  signer: null
+};
+
+// =============================
+// SYSTEM LOGGER
+// =============================
 function updateSystem(msg) {
-    const out = document.getElementById("output");
-    if (out) out.innerHTML = msg;
+  const el = document.getElementById("output");
+  if (el) el.innerHTML = msg;
 }
 
-// --- LOGIC & SIMULATION ---
+// =============================
+// ENGINE INIT (CRITICAL FIX)
+// =============================
+window.initEngine = function () {
+  console.log("Engine Init Triggered");
+
+  // HARD SYNC (anti bug metamask mobile)
+  if (window.userAddress && window.provider) {
+    window.wallet.address = window.userAddress;
+    window.wallet.provider = window.provider;
+    window.wallet.signer = window.provider.getSigner();
+  }
+
+  if (!window.wallet.address) {
+    updateSystem("> ERROR: Wallet not synced");
+    return;
+  }
+
+  fetchBalances();
+  setupEventListeners();
+  simulateExecution();
+
+  updateSystem("> SYSTEM: Engine Online. Wallet Synced.");
+};
+
+// =============================
+// SIMULATION
+// =============================
 function simulateExecution() {
-    const amt = document.getElementById("amountIn").value;
-    const tInKey = document.getElementById("tokenIn").value;
-    const tOutKey = document.getElementById("tokenOut").value;
+  const amt = parseFloat(document.getElementById("amountIn").value);
+  const tIn = document.getElementById("tokenIn").value;
+  const tOut = document.getElementById("tokenOut").value;
 
-    if (!amt || amt <= 0) {
-        document.getElementById("amountOut").value = "0.00";
-        return;
-    }
+  if (!amt || amt <= 0) {
+    document.getElementById("amountOut").value = "0.00";
+    return;
+  }
 
-    const pIn = DEX_CONFIG.TOKENS[tInKey].price;
-    const pOut = DEX_CONFIG.TOKENS[tOutKey].price;
-    const est = (amt * pIn) / pOut;
-    
-    document.getElementById("amountOut").value = est.toFixed(6);
-    updateSystem(`> ROUTE: ${tInKey} → ${tOutKey}<br>> POOL: Private (0x7253...)`);
+  if (tIn === tOut) {
+    updateSystem("> INVALID: Token tidak boleh sama");
+    return;
+  }
+
+  const est =
+    (amt * DEX_CONFIG.TOKENS[tIn].price) /
+    DEX_CONFIG.TOKENS[tOut].price;
+
+  document.getElementById("amountOut").value = est.toFixed(6);
+
+  updateSystem(`
+    > ROUTE: ${tIn} → ${tOut}
+    <br>> EST: ${est.toFixed(6)}
+  `);
 }
 
+// =============================
+// EXECUTION (REAL)
+// =============================
 async function executeSwap() {
-    const btn = document.getElementById("btnSwap");
-    if (!window.wallet.address) return updateSystem("> ERROR: Handshake Failed.");
+  const btn = document.getElementById("btnSwap");
 
-    try {
-        btn.disabled = true;
-        btn.innerText = "EXECUTING...";
+  if (!window.wallet.address) {
+    return updateSystem("> ERROR: Wallet not connected");
+  }
 
-        const amountIn = document.getElementById("amountIn").value;
-        const tInKey = document.getElementById("tokenIn").value;
-        const tOutKey = document.getElementById("tokenOut").value;
+  try {
+    btn.disabled = true;
+    btn.innerText = "PROCESSING...";
 
-        const path = [DEX_CONFIG.TOKENS[tInKey].address, DEX_CONFIG.TOKENS[tOutKey].address];
-        const pools = [DEX_CONFIG.POOLS.SIMULATION_POOL];
+    const amountIn = document.getElementById("amountIn").value;
+    const tIn = document.getElementById("tokenIn").value;
+    const tOut = document.getElementById("tokenOut").value;
 
-        const amtWei = ethers.utils.parseUnits(amountIn.toString(), 18);
-        const executor = new ethers.Contract(EXECUTOR_ADDR, EXECUTOR_ABI, window.wallet.signer);
+    if (tIn === tOut) throw new Error("Token input & output sama");
 
-        // 1. APPROVE
-        updateSystem("> STATUS: Approving Asset...");
-        const tokenIn = new ethers.Contract(path[0], ["function approve(address,uint256) returns (bool)"], window.wallet.signer);
-        const txA = await tokenIn.approve(EXECUTOR_ADDR, amtWei);
-        await txA.wait();
+    const path = [
+      DEX_CONFIG.TOKENS[tIn].address,
+      DEX_CONFIG.TOKENS[tOut].address
+    ];
 
-        // 2. EXECUTE
-        updateSystem("> STATUS: Swapping via Private Pool...");
-        const txS = await executor.executeRoute(pools, path, amtWei, 0);
-        
-        updateSystem(`> TX SENT: ${txS.hash.substring(0,25)}...`);
-        await txS.wait();
-        updateSystem("> SUCCESS: Swap Processed On-Chain.");
-        fetchBalances();
+    const pools = [DEX_CONFIG.POOLS.WOPN_OPNT];
 
-    } catch (err) {
-        updateSystem(`> FAILED: ${err.message.substring(0, 50)}`);
-    } finally {
-        btn.disabled = false;
-        btn.innerText = "INITIATE SWAP";
+    if (!pools[0] || pools[0].includes("ISI")) {
+      throw new Error("POOL BELUM DISET");
     }
+
+    const amtWei = ethers.utils.parseUnits(amountIn.toString(), 18);
+
+    const executor = new ethers.Contract(
+      EXECUTOR_ADDR,
+      EXECUTOR_ABI,
+      window.wallet.signer
+    );
+
+    // APPROVE
+    updateSystem("> APPROVING...");
+    const token = new ethers.Contract(
+      path[0],
+      ["function approve(address,uint256) returns (bool)"],
+      window.wallet.signer
+    );
+
+    const txA = await token.approve(EXECUTOR_ADDR, amtWei);
+    await txA.wait();
+
+    // EXECUTE
+    updateSystem("> EXECUTING...");
+    const tx = await executor.executeRoute(
+      pools,
+      path,
+      amtWei,
+      0
+    );
+
+    updateSystem("> TX SENT: " + tx.hash);
+
+    await tx.wait();
+
+    updateSystem("> SUCCESS: SWAP COMPLETE");
+
+    fetchBalances();
+
+  } catch (err) {
+    updateSystem("> FAILED: " + (err.reason || err.message));
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "INITIATE SWAP";
+  }
 }
 
-// --- DATA FETCHING ---
+// =============================
+// BALANCE FETCH
+// =============================
 async function fetchBalances() {
-    if (!window.wallet.address) return;
-    const grid = document.getElementById("balance-grid");
+  if (!window.wallet.address) return;
+
+  const grid = document.getElementById("balance-grid");
+  grid.innerHTML = "...";
+
+  try {
+    const results = await Promise.all(
+      Object.keys(DEX_CONFIG.TOKENS).map(async (key) => {
+        const token = DEX_CONFIG.TOKENS[key];
+
+        const contract = new ethers.Contract(
+          token.address,
+          ["function balanceOf(address) view returns (uint256)"],
+          window.wallet.provider
+        );
+
+        const bal = await contract.balanceOf(window.wallet.address);
+
+        return {
+          symbol: key,
+          balance: ethers.utils.formatUnits(bal, 18)
+        };
+      })
+    );
+
     grid.innerHTML = "";
-    
-    try {
-        const results = await Promise.all(Object.keys(DEX_CONFIG.TOKENS).map(async (key) => {
-            const token = DEX_CONFIG.TOKENS[key];
-            const contract = new ethers.Contract(token.address, ["function balanceOf(address) view returns (uint256)"], window.wallet.provider);
-            const b = await contract.balanceOf(window.wallet.address);
-            return { symbol: key, balance: ethers.utils.formatUnits(b, 18) };
-        }));
 
-        results.forEach(res => {
-            grid.innerHTML += `<div class="card"><small>${res.symbol}</small><div class="val">${parseFloat(res.balance).toFixed(4)}</div></div>`;
-        });
-    } catch (e) { console.error("Sync Error", e); }
-}
-
-function setupEventListeners() {
-    ["amountIn", "tokenIn", "tokenOut"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.oninput = simulateExecution;
-            el.onchange = simulateExecution;
-        }
+    results.forEach((r) => {
+      grid.innerHTML += `
+        <div class="card">
+          <small>${r.symbol}</small>
+          <div class="val">${parseFloat(r.balance).toFixed(4)}</div>
+        </div>
+      `;
     });
+
+  } catch (e) {
+    console.error(e);
+    grid.innerHTML = "<div class='card'>ERROR</div>";
+  }
 }
 
-window.fetchBalances = fetchBalances;
-window.simulateExecution = simulateExecution;
-window.executeSwap = executeSwap;
+// =============================
+// EVENT LISTENER
+// =============================
+function setupEventListeners() {
+  ["amountIn", "tokenIn", "tokenOut"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
 
+    el.oninput = simulateExecution;
+    el.onchange = simulateExecution;
+  });
+}
+
+// =============================
+window.executeSwap = executeSwap;
+window.simulateExecution = simulateExecution;
+window.fetchBalances = fetchBalances;
