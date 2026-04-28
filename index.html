@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DEX OPTIMIZER - GOLD EDITION V1</title>
+  <title>GOLD OPTIMIZER - V1.0.3</title>
   <style>
     :root {
       --gold-gradient: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
@@ -15,19 +15,21 @@
     h2 { font-size: 16px; letter-spacing: 2px; background: var(--gold-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; font-weight: 800; }
     .btn-connect { background: var(--gold-gradient); color: #000; padding: 8px 16px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; font-size: 11px; box-shadow: 0 0 10px rgba(191,149,63,0.4); }
     .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 450px; margin-bottom: 20px; }
-    .card { background: var(--card-bg); border: 1px solid #2a2110; padding: 12px; border-radius: 12px; border-left: 3px solid #bf953f; }
+    .card { background: var(--card-bg); border: 1px solid #2a2110; padding: 12px; border-radius: 12px; border-left: 3px solid #bf953f; transition: 0.3s; }
+    .card:hover { border-color: #bf953f; box-shadow: inset 0 0 10px rgba(191,149,63,0.1); }
     .card small { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
     .card .val { font-size: 14px; font-weight: bold; color: #fcf6ba; margin-top: 2px; }
     .swap-container { background: var(--card-bg); border: 1px solid #2a2110; padding: 20px; border-radius: 24px; width: 100%; max-width: 400px; box-shadow: 0 10px 40px rgba(0,0,0,0.7); }
     .input-group { background: #000; padding: 15px; border-radius: 16px; border: 1px solid #1c1c1c; margin-bottom: 5px; }
-    .input-group label { font-size: 10px; color: #666; display: block; margin-bottom: 5px; }
+    .input-group label { font-size: 10px; color: #666; display: block; margin-bottom: 5px; font-weight: bold; }
     .input-row { display: flex; justify-content: space-between; align-items: center; }
-    input { background: transparent; border: none; color: white; font-size: 18px; font-weight: bold; width: 60%; outline: none; }
-    select { background: #111; color: #fcf6ba; border: 1px solid #333; padding: 5px; border-radius: 5px; font-size: 12px; }
+    input { background: transparent; border: none; color: white; font-size: 18px; font-weight: bold; width: 55%; outline: none; font-family: monospace; }
+    select { background: #111; color: #fcf6ba; border: 1px solid #333; padding: 6px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; }
     .divider { text-align: center; margin: -12px 0; position: relative; z-index: 5; }
-    .arrow-down { background: #000; border: 1px solid #bf953f; color: #bf953f; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 12px; }
-    .btn-swap { width: 100%; padding: 15px; margin-top: 15px; background: var(--gold-gradient); border: none; border-radius: 16px; color: #000; font-weight: bold; font-size: 14px; cursor: pointer; text-transform: uppercase; }
-    .output-log { margin-top: 20px; background: #000; border: 1px solid #222; padding: 12px; border-radius: 10px; font-family: 'Courier New', monospace; font-size: 10px; color: #bf953f; width: 100%; max-width: 420px; line-height: 1.4; min-height: 60px; }
+    .arrow-down { background: #000; border: 1px solid #bf953f; color: #bf953f; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 12px; box-shadow: 0 0 10px rgba(191,149,63,0.3); }
+    .btn-swap { width: 100%; padding: 16px; margin-top: 15px; background: var(--gold-gradient); border: none; border-radius: 16px; color: #000; font-weight: bold; font-size: 14px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s; }
+    .btn-swap:active { transform: scale(0.98); opacity: 0.8; }
+    .output-log { margin-top: 20px; background: #000; border: 1px solid #222; padding: 12px; border-radius: 10px; font-family: 'Courier New', monospace; font-size: 10px; color: #bf953f; width: 100%; max-width: 420px; line-height: 1.4; min-height: 60px; border-bottom: 2px solid #bf953f; }
   </style>
 </head>
 <body>
@@ -37,16 +39,17 @@
     <button id="btnConnect" class="btn-connect" onclick="connectWallet()">CONNECT WALLET</button>
   </div>
 
-  <div id="balance-grid" class="grid"></div>
+  <div id="balance-grid" class="grid">
+    </div>
 
   <div class="swap-container">
     <div class="input-group">
         <label>SELL</label>
         <div class="input-row">
-            <input id="amountIn" type="number" value="1" oninput="simulateExecution()">
-            <select id="tokenIn" onchange="simulateExecution()">
+            <input id="amountIn" type="number" value="10" placeholder="0.0">
+            <select id="tokenIn">
                 <option value="tUSDT">tUSDT</option>
-                <option value="OPN">OPN</option>
+                <option value="OPN">OPN (Native)</option>
             </select>
         </div>
     </div>
@@ -55,9 +58,9 @@
         <label>BUY (ESTIMATE)</label>
         <div class="input-row">
             <input id="amountOut" type="text" placeholder="0.00" readonly>
-            <select id="tokenOut" onchange="simulateExecution()">
-                <option value="TETE">TETE</option>
+            <select id="tokenOut">
                 <option value="tBNB">tBNB</option>
+                <option value="TETE">TETE</option>
                 <option value="OPNT">OPNT</option>
             </select>
         </div>
@@ -65,7 +68,7 @@
     <button class="btn-swap" onclick="executeSwap()">CONFIRM SWAP</button>
   </div>
 
-  <div id="output" class="output-log">> SYSTEM: Awaiting secure connection...</div>
+  <div id="output" class="output-log">> SYSTEM: Engine offline. Please connect wallet.</div>
 
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <script src="app.js"></script>
@@ -77,11 +80,15 @@
           const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
           window.userAddress = accounts[0];
           window.provider = new ethers.providers.Web3Provider(window.ethereum);
-          document.getElementById('btnConnect').innerText = window.userAddress.substring(0,6)+"..."+window.userAddress.substring(38);
-          if (window.fetchBalances) window.fetchBalances();
-          if (window.setupEventListeners) window.setupEventListeners();
-          simulateExecution();
-        } catch (err) { document.getElementById('output').innerText = "> ERR: " + err.message; }
+          
+          const shortAddr = window.userAddress.substring(0,6)+"..."+window.userAddress.substring(38);
+          document.getElementById('btnConnect').innerText = shortAddr;
+          document.getElementById('btnConnect').style.boxShadow = "0 0 15px rgba(0,255,0,0.2)";
+
+          if (window.initEngine) window.initEngine();
+        } catch (err) { 
+          document.getElementById('output').innerText = "> ERR: " + err.message; 
+        }
       } else { alert("Please use Mises/MetaMask Browser!"); }
     }
   </script>

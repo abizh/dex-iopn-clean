@@ -1,8 +1,9 @@
 /**
- * MASTER CODE APP.JS - PHASE 3 FINAL
- * Standard: Gold Edition | Precision: High
+ * MASTER CODE APP.JS - GOLD EDITION STABLE
+ * Standard: High Precision | Fix: Initialization Order
  */
 
+// 1. Definisikan Konfigurasi Terlebih Dahulu (Global Scope)
 const ROUTER_ADDR = ethers.utils.getAddress("0x8979D19E528148b329431835773199D6aE7e748A");
 
 const DEX_CONFIG = {
@@ -22,6 +23,14 @@ const FULL_ABI = [
     "function allowance(address owner, address spender) view returns (uint256)",
     "function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) returns (uint[] memory amounts)"
 ];
+
+// 2. Inisialisasi Engine setelah Wallet Connect
+window.initEngine = function() {
+    fetchBalances();
+    setupEventListeners();
+    simulateExecution();
+    document.getElementById('output').innerHTML = "> SYSTEM: Engine online. Assets synced.";
+};
 
 async function fetchBalances() {
     if (!window.userAddress || !window.provider) return;
@@ -51,16 +60,26 @@ async function fetchBalances() {
 }
 
 function simulateExecution() {
-    const amountIn = document.getElementById('amountIn').value;
+    // Safety check agar tidak error jika elemen belum ada
+    const amountInEl = document.getElementById('amountIn');
+    if(!amountInEl) return;
+
+    const amountIn = amountInEl.value;
     const tokenInKey = document.getElementById('tokenIn').value;
     const tokenOutKey = document.getElementById('tokenOut').value;
-    if (amountIn <= 0) return;
+    const output = document.getElementById('output');
+
+    if (amountIn <= 0) {
+        document.getElementById('amountOut').value = "0.00";
+        return;
+    }
 
     const pIn = DEX_CONFIG.TOKENS[tokenInKey].price;
     const pOut = DEX_CONFIG.TOKENS[tokenOutKey].price;
     const estOut = (amountIn * pIn) / pOut;
+
     document.getElementById('amountOut').value = estOut.toFixed(6);
-    document.getElementById('output').innerHTML = `> ROUTE: ${tokenInKey} → ${tokenOutKey}<br>> EST: ${estOut.toFixed(4)} ${tokenOutKey}`;
+    output.innerHTML = `> ROUTE FOUND: ${tokenInKey} → ${tokenOutKey}<br>> EST. RECEIVE: <span style="color:#00ff00;">${estOut.toFixed(6)}</span>`;
 }
 
 async function executeSwap() {
@@ -70,7 +89,7 @@ async function executeSwap() {
     const tOut = DEX_CONFIG.TOKENS[document.getElementById('tokenOut').value];
     
     if (tIn.address === "NATIVE") {
-        output.innerHTML = "> <span style='color:orange;'>NATIVE SWAP (PHASE 4) REQUIRED. USE tUSDT FOR TESTING PHASE 3.</span>";
+        output.innerHTML = "> <span style='color:orange;'>NOTICE: NATIVE SWAP (PHASE 4) UNDER DEV. PLEASE TEST WITH tUSDT.</span>";
         return;
     }
 
@@ -79,36 +98,44 @@ async function executeSwap() {
         const amountInWei = ethers.utils.parseUnits(amountInVal.toString(), 18);
         const tokenContract = new ethers.Contract(tIn.address, FULL_ABI, signer);
         
-        output.innerHTML = `> CHECKING ALLOWANCE...`;
+        output.innerHTML = `> STEP 1: VALIDATING ALLOWANCE...`;
         const allowance = await tokenContract.allowance(window.userAddress, ROUTER_ADDR);
         
         if (allowance.lt(amountInWei)) {
-            output.innerHTML += `<br>> APPROVING ${tIn.symbol}...`;
+            output.innerHTML += `<br>> STEP 2: REQUESTING APPROVAL...`;
             const txA = await tokenContract.approve(ROUTER_ADDR, ethers.constants.MaxUint256);
             await txA.wait();
-            output.innerHTML += `<br>> <span style='color:green;'>APPROVED!</span>`;
+            output.innerHTML += `<br>> <span style='color:green;'>APPROVAL GRANTED.</span>`;
         }
 
-        output.innerHTML += `<br>> EXECUTING SWAP ON-CHAIN...`;
+        output.innerHTML += `<br>> STEP 3: EXECUTING SWAP...`;
         const router = new ethers.Contract(ROUTER_ADDR, FULL_ABI, signer);
         const path = [tIn.address, tOut.address];
         const deadline = Math.floor(Date.now() / 1000) + 600;
 
         const txS = await router.swapExactTokensForTokens(amountInWei, 0, path, window.userAddress, deadline);
-        output.innerHTML += `<br>> TX: ${txS.hash.substring(0,15)}...`;
+        output.innerHTML += `<br>> TX SEND: ${txS.hash.substring(0,18)}...`;
         await txS.wait();
-        output.innerHTML += `<br>> <span style='color:green; font-weight:bold;'>SWAP SUCCESS!</span>`;
+        output.innerHTML += `<br>> <span style='color:green; font-weight:bold;'>SUCCESS! ASSETS EXCHANGED.</span>`;
         fetchBalances();
     } catch (err) {
-        output.innerHTML += `<br><span style='color:red;'>> ERROR: ${err.reason || "Check Wallet"}</span>`;
+        output.innerHTML += `<br><span style='color:red;'>> ERROR: ${err.reason || "Transaction Denied"}</span>`;
     }
 }
 
 function setupEventListeners() {
-    window.provider.on("block", () => fetchBalances());
+    // Re-calculate saat input berubah
+    document.getElementById('amountIn').addEventListener('input', simulateExecution);
+    document.getElementById('tokenIn').addEventListener('change', simulateExecution);
+    document.getElementById('tokenOut').addEventListener('change', simulateExecution);
+    
+    // Auto sync tiap blok
+    if(window.provider) {
+        window.provider.on("block", () => fetchBalances());
+    }
 }
 
+// Export agar bisa dibaca script lain jika perlu
 window.fetchBalances = fetchBalances;
-window.setupEventListeners = setupEventListeners;
 window.simulateExecution = simulateExecution;
 window.executeSwap = executeSwap;
