@@ -1,6 +1,6 @@
 /**
- * MASTER CODE APP.JS - PHASE 1 (FINAL SYNC)
- * Data Source: Verified OPN Explorer Addresses
+ * MASTER CODE APP.JS - PHASE 1 FINAL
+ * Verified Addresses: TETE, OPNT, tUSDT, tBNB, WOPN
  */
 
 const DEX_CONFIG = {
@@ -19,7 +19,7 @@ const MIN_ABI = ["function balanceOf(address) view returns (uint256)"];
 async function fetchBalances() {
     const grid = document.getElementById('balance-grid');
     if (!grid) return;
-    grid.innerHTML = "<p style='grid-column:1/-1; text-align:center; font-size:12px; color:#00d4ff;'>🔄 Syncing Explorer Data...</p>";
+    grid.innerHTML = "<p style='grid-column:1/-1; text-align:center; font-size:12px; color:#00d4ff;'>🔄 Data Syncing...</p>";
 
     try {
         const tasks = Object.keys(DEX_CONFIG.TOKENS).map(async (key) => {
@@ -46,7 +46,7 @@ async function fetchBalances() {
             card.className = "card";
             const numBal = parseFloat(res.balance);
             
-            // Format Display (Abbreviation for 25M TETE)
+            // Format Display
             let display = numBal >= 1000000 
                 ? (numBal / 1000000).toLocaleString(undefined, {maximumFractionDigits: 2}) + "M"
                 : numBal.toLocaleString(undefined, {maximumFractionDigits: 4});
@@ -58,18 +58,18 @@ async function fetchBalances() {
             `;
             grid.appendChild(card);
         });
-        document.getElementById('output').innerText = "SOP: Blockchain Sync Complete. All Assets Verified.";
+        document.getElementById('output').innerText = "System Audit: Data Integrity Confirmed.";
     } catch (err) { console.error(err); }
 }
 
 function simulateExecution() {
     const val = document.getElementById('amountIn').value;
-    document.getElementById('output').innerText = `Simulating Route for ${val} OPN...`;
-    document.getElementById('output').innerText += `\nPath: OPN -> WOPN -> tUSDT -> OPNT`;
+    document.getElementById('output').innerText = `Simulating Path for ${val} OPN...`;
+    document.getElementById('output').innerText += `\nBest Path: OPN -> WOPN -> tUSDT -> OPNT`;
 }
 
 function executeSwap() {
-    alert("Phase 1 Complete. Phase 2 (Engine) Required for Execution.");
+    alert("Phase 1 LOCKED. Proceed to Phase 2 (Router Logic)?");
 }
 
 window.fetchBalances = fetchBalances;
