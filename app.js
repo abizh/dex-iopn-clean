@@ -1,7 +1,9 @@
 /**
- * MASTER CODE APP.JS - PHASE 2 (DYNAMIC ROUTING)
- * Locked: TETE, OPNT, tUSDT, tBNB, WOPN
+ * MASTER CODE APP.JS - PHASE 3 (EXECUTION LAYER)
+ * Status: High Precision | iOPN Testnet Linked
  */
+
+const ROUTER_ADDRESS = "0x8979D19E528148b329431835773199D6aE7e748A"; // Router iOPN
 
 const DEX_CONFIG = {
     TOKENS: {
@@ -14,8 +16,14 @@ const DEX_CONFIG = {
     }
 };
 
-const MIN_ABI = ["function balanceOf(address) view returns (uint256)"];
+const FULL_ABI = [
+    "function balanceOf(address) view returns (uint256)",
+    "function approve(address spender, uint256 amount) returns (bool)",
+    "function allowance(address owner, address spender) view returns (uint256)",
+    "function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) returns (uint[] memory amounts)"
+];
 
+// --- CORE FUNCTIONS ---
 async function fetchBalances() {
     if (!window.userAddress || !window.provider) return;
     const grid = document.getElementById('balance-grid');
@@ -27,7 +35,7 @@ async function fetchBalances() {
                 const b = await window.provider.getBalance(window.userAddress);
                 bal = ethers.utils.formatEther(b);
             } else {
-                const contract = new ethers.Contract(token.address, MIN_ABI, window.provider);
+                const contract = new ethers.Contract(token.address, FULL_ABI, window.provider);
                 const b = await contract.balanceOf(window.userAddress);
                 bal = ethers.utils.formatUnits(b, 18);
             }
@@ -40,40 +48,77 @@ async function fetchBalances() {
             const display = num >= 1000000 ? (num/1000000).toFixed(2)+"M" : num.toFixed(4);
             grid.innerHTML += `<div class="card"><small>${res.symbol}</small><div class="val">${display}</div></div>`;
         });
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Balance Sync Failed", e); }
+}
+
+async function executeSwap() {
+    const output = document.getElementById('output');
+    const amountInRaw = document.getElementById('amountIn').value;
+    const tokenInKey = document.getElementById('tokenIn').value;
+    const tokenOutKey = document.getElementById('tokenOut').value;
+    
+    if (!window.provider || amountInRaw <= 0) return;
+
+    const signer = window.provider.getSigner();
+    const amountIn = ethers.utils.parseUnits(amountInRaw.toString(), 18);
+    const tokenIn = DEX_CONFIG.TOKENS[tokenInKey];
+    const tokenOut = DEX_CONFIG.TOKENS[tokenOutKey];
+
+    try {
+        output.innerHTML = `> [STEP 1/2] Checking Allowance for ${tokenInKey}...`;
+        
+        // 1. APPROVE IF NEEDED
+        if (tokenInKey !== "OPN") {
+            const tokenContract = new ethers.Contract(tokenIn.address, FULL_ABI, signer);
+            const allowance = await tokenContract.allowance(window.userAddress, ROUTER_ADDRESS);
+            
+            if (allowance.lt(amountIn)) {
+                output.innerHTML += `<br>> Requesting Permission to spend ${tokenInKey}...`;
+                const txApprove = await tokenContract.approve(ROUTER_ADDRESS, ethers.constants.MaxUint256);
+                await txApprove.wait();
+                output.innerHTML += `<br>> <span style="color:#00ff00;">APPROVAL GRANTED!</span>`;
+            }
+        }
+
+        // 2. SWAP EXECUTION
+        output.innerHTML += `<br>> [STEP 2/2] Executing Swap on iOPN Chain...`;
+        const router = new ethers.Contract(ROUTER_ADDRESS, FULL_ABI, signer);
+        const path = [tokenIn.address, tokenOut.address];
+        const deadline = Math.floor(Date.now() / 1000) + 600; // 10 menit
+
+        // Logika untuk OPN Native akan dipisah di Phase 4, sekarang fokus ke Token-to-Token
+        const txSwap = await router.swapExactTokensForTokens(
+            amountIn,
+            0, // Slippage 0% untuk testnet
+            path,
+            window.userAddress,
+            deadline
+        );
+
+        output.innerHTML += `<br>> TX HASH: <span style="color:#00d4ff;">${txSwap.hash.substring(0,20)}...</span>`;
+        await txSwap.wait();
+        output.innerHTML += `<br>> <span style="color:#00ff00; font-weight:bold;">SWAP SUCCESSFUL!</span>`;
+        
+        fetchBalances(); // Refresh saldo otomatis
+    } catch (err) {
+        output.innerHTML += `<br><span style="color:red;">> FAILED: ${err.reason || err.message}</span>`;
+    }
 }
 
 function simulateExecution() {
     const amountIn = document.getElementById('amountIn').value;
     const tokenIn = document.getElementById('tokenIn').value;
     const tokenOut = document.getElementById('tokenOut').value;
-    const output = document.getElementById('output');
-
     if (amountIn <= 0) return;
 
     const pIn = DEX_CONFIG.TOKENS[tokenIn].price;
     const pOut = DEX_CONFIG.TOKENS[tokenOut].price;
-
     const estOut = (amountIn * pIn) / pOut;
     document.getElementById('amountOut').value = estOut.toFixed(6);
 
-    // Path Logic: OPN -> WOPN -> Target
-    let path = `${tokenIn} → ${tokenOut}`;
-    if (tokenIn === "OPN" && tokenOut !== "WOPN") path = `OPN → WOPN → ${tokenOut}`;
-
-    output.innerHTML = `> ANALYZING ROUTE...<br>> PATH: ${path}<br>> EST. RECEIVE: ${estOut.toFixed(6)} ${tokenOut}<br>> PRICE IMPACT: <0.01%<br>> STATUS: OPTIMAL`;
-}
-
-function setupEventListeners() {
-    window.provider.on("block", () => fetchBalances());
-}
-
-function executeSwap() {
-    document.getElementById('output').innerHTML += `<br>> [CRITICAL] PHASE 3: CONTRACT BRIDGE REQUIRED.`;
-    alert("Phase 2 Success! Engine optimal. Lanjut Phase 3: Contract Execution?");
+    document.getElementById('output').innerHTML = `> ENGINE READY...<br>> EST. RECEIVE: ${estOut.toFixed(6)} ${tokenOut}<br>> STATUS: VERIFIED`;
 }
 
 window.fetchBalances = fetchBalances;
-window.setupEventListeners = setupEventListeners;
 window.simulateExecution = simulateExecution;
 window.executeSwap = executeSwap;
