@@ -1,158 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DEX ROUTE OPTIMIZER | iOPN</title>
+    <title>DEX Optimizer Phase 1</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
     <style>
-        :root {
-            --bg-dark: #0b0f14;
-            --card-bg: #161b22;
-            --primary-blue: #00d4ff;
-            --success-green: #28a745;
-            --error-red: #ff4d4d;
-            --text-muted: #8b949e;
-        }
-        body { background: var(--bg-dark); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 450px; }
-        h2 { color: var(--primary-blue); margin: 0; text-transform: uppercase; font-size: 1.4rem; }
-        .divider { height: 1px; background: #30363d; margin: 15px 0; }
-        input { width: 100%; padding: 12px; background: #1a1f26; border: 1px solid #30363d; border-radius: 8px; color: white; margin-bottom: 20px; box-sizing: border-box; font-size: 1rem; }
-        button { width: 100%; padding: 14px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; margin-bottom: 10px; }
-        .btn-connect { background: white; color: black; }
-        .btn-disconnect { background: var(--error-red); color: white; display: none; }
-        .btn-simulate { background: var(--success-green); color: white; flex: 1; }
-        .btn-execute { background: var(--primary-blue); color: white; flex: 1; }
-        .status-box { background: var(--card-bg); border: 1px solid #30363d; border-radius: 12px; padding: 15px; margin-top: 15px; }
-        .address-display { text-align: center; font-family: monospace; color: var(--text-muted); margin-bottom: 10px; font-size: 0.9rem; }
+        body { background:#050505; color:white; font-family:sans-serif; padding:20px; }
+        .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; margin-top:20px; }
+        button { background:#0062ff; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; }
     </style>
 </head>
 <body>
-
-<div class="container">
-    <h2>DEX ROUTE OPTIMIZER</h2>
-    <div style="color: var(--text-muted); font-size: 0.8rem; letter-spacing: 1px;">iOPN TESTNET ENGINE v1.0</div>
+    <h1>DEX ROUTE OPTIMIZER <small style="font-size:12px; color:#555;">Phase 1</small></h1>
+    <button id="btn-connect" onclick="connectWallet()">Connect Wallet</button>
+    <p id="wallet-address" style="color:#888; font-size:0.8rem;"></p>
     
-    <div class="divider"></div>
+    <div id="balance-grid" class="grid">
+        </div>
 
-    <label style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-bottom: 5px;">Amount In (OPN):</label>
-    <input id="amountIn" type="number" value="10">
-
-    <button id="btnConnect" class="btn-connect" onclick="handleWalletAction()">CONNECT WALLET</button>
-    <div id="walletAddress" class="address-display">Not Connected</div>
-    <button id="btnDisconnect" class="btn-disconnect" onclick="disconnectWallet()">DISCONNECT WALLET</button>
-
-    <div style="display: flex; gap: 10px;">
-        <button class="btn-simulate" onclick="runSimulation()">SIMULATE</button>
-        <button class="btn-execute" onclick="executeReal()">EXECUTE (REAL)</button>
-    </div>
-
-    <div class="status-box">
-        <span style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted);">BEST ROUTE</span>
-        <div id="route" style="color:#00ff00; font-family: monospace; margin-top:5px; font-weight: bold;">-</div>
-    </div>
-
-    <div class="status-box">
-        <span style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted);">OUTPUT LOG</span>
-        <div id="output" style="font-family: monospace; font-size: 0.85rem; margin-top:5px; color: #abb2bf;">-</div>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-
-<script>
-let currentAccount = null;
-const IOPN_PARAMS = {
-    chainId: '0x3d8', // 984 in Hex
-    chainName: 'OPN Testnet',
-    nativeCurrency: { name: 'OPN', symbol: 'OPN', decimals: 18 },
-    rpcUrls: ['https://testnet-rpc2.iopn.tech'],
-    blockExplorerUrls: ['https://testnet.iopn.tech']
-};
-
-async function handleWalletAction() {
-    if (!window.ethereum) return alert("Wallet not found!");
-    try {
-        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-        currentAccount = accounts[0];
-        await checkAndSwitchNetwork();
-        updateUI();
-    } catch (err) { console.error(err); }
-}
-
-async function checkAndSwitchNetwork() {
-    try {
-        await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: IOPN_PARAMS.chainId }],
-        });
-    } catch (error) {
-        if (error.code === 4902) {
-            try {
-                await window.ethereum.request({
-                    method: 'wallet_addEthereumChain',
-                    params: [IOPN_PARAMS],
-                });
-            } catch (addError) { alert("Failed to add iOPN network."); }
-        }
-    }
-}
-
-function disconnectWallet() {
-    currentAccount = null;
-    updateUI();
-}
-
-function updateUI() {
-    const addrEl = document.getElementById("walletAddress");
-    const btnConn = document.getElementById("btnConnect");
-    const btnDisc = document.getElementById("btnDisconnect");
-
-    if (currentAccount) {
-        addrEl.innerText = currentAccount.slice(0,6) + "..." + currentAccount.slice(-4);
-        addrEl.style.color = "#00ff00";
-        btnConn.style.display = "none";
-        btnDisc.style.display = "block";
-    } else {
-        addrEl.innerText = "Not Connected";
-        addrEl.style.color = "#8b949e";
-        btnConn.style.display = "block";
-        btnDisc.style.display = "none";
-    }
-}
-
-async function runSimulation() {
-    const amount = document.getElementById("amountIn").value || 1;
-    document.getElementById("route").innerText = "Searching route...";
-    try {
-        const res = await fetch("/api/route", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tokenIn: "OPN", tokenOut: "OPNT", amount: Number(amount) })
-        });
-        const data = await res.json();
-        document.getElementById("route").innerText = data.route.join(" → ");
-        document.getElementById("output").innerText = "Simulated: " + data.expectedOut + " OPNT";
-    } catch (err) {
-        document.getElementById("output").innerText = "Simulation failed. Check API.";
-    }
-}
-
-async function executeReal() {
-    if (!currentAccount) return alert("Connect wallet first!");
-    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (chainId !== IOPN_PARAMS.chainId) return await checkAndSwitchNetwork();
-    alert("Executing transaction on iOPN Testnet...");
-}
-
-window.addEventListener("load", async () => {
-    if (window.ethereum) {
-        const accounts = await window.ethereum.request({ method: "eth_accounts" });
-        if (accounts.length > 0) { currentAccount = accounts[0]; updateUI(); }
-        window.ethereum.on("accountsChanged", (acc) => { currentAccount = acc[0] || null; updateUI(); });
-        window.ethereum.on("chainChanged", () => window.location.reload());
-    }
-});
-</script>
+    <script src="app.js"></script>
 </body>
 </html>

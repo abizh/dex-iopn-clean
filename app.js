@@ -1,153 +1,75 @@
-// ==========================================================
-// DEX EXECUTION BRIDGE (SAFE MODE READY)
-// ==========================================================
+/**
+ * PHASE 1 - CORE DATA & REGISTRY (AUDITED)
+ * Penempatan: Paste total di file app.js
+ */
 
-let provider;
-let signer;
-let userAddress;
-
-// ===== CONTRACT =====
-const EXECUTOR_ADDRESS = "0x1bc2220B0a863d4c7c85d399A31AE08BB74e7407";
-
-const EXECUTOR_ABI = [
-  "function executeRoute((address pool,address tokenIn,address tokenOut,uint256 amountIn)[] steps,uint256 minOut,address recipient) external returns (uint256)"
-];
-
-// ===== CONNECT WALLET =====
-async function connectWallet() {
-  let ethProvider = null;
-
-  if (window.ethereum) {
-    ethProvider = window.ethereum;
-  } else if (window.okxwallet) {
-    ethProvider = window.okxwallet;
-  } else if (window.rabby) {
-    ethProvider = window.rabby;
-  }
-
-  if (!ethProvider) {
-    alert("Wallet tidak ditemukan");
-    return;
-  }
-
-  try {
-    // 🔥 METHOD UNIVERSAL
-    const accounts = await ethProvider.request({
-      method: "eth_requestAccounts"
-    });
-
-    const address = accounts[0];
-
-    const provider = new ethers.providers.Web3Provider(ethProvider);
-    const signer = provider.getSigner();
-
-    document.getElementById("wallet").innerText =
-      address.slice(0, 6) + "..." + address.slice(-4);
-
-  } catch (err) {
-    console.error("CONNECT ERROR:", err);
-
-    // 🔥 DETAIL ERROR
-    if (err.code === 4001) {
-      alert("User menolak koneksi wallet");
-    } else {
-      alert("Gagal konek wallet: " + err.message);
+const DEX_CONFIG = {
+    NETWORK: {
+        chainId: '0x3d8', // Hex dari 984
+        name: "iOPN Testnet",
+        rpc: "https://testnet.iopn.tech"
+    },
+    TOKENS: {
+        "OPN":   { symbol: "OPN",   name: "iOPN Native",  address: "NATIVE", decimals: 18 },
+        "wOPN":  { symbol: "wOPN",  name: "Wrapped OPN",  address: "0x2e061801C7a780e9D577c61f207044621E8b62CC", decimals: 18 },
+        "tUSDT": { symbol: "tUSDT", name: "Testnet USDT", address: "0x77E154687D04a601968840212720d939626A0EBe", decimals: 18 },
+        "tBNB":  { symbol: "tBNB",  name: "Testnet BNB",  address: "0xd0294b4E48043685f0A1F0571C3527027C0E4a81", decimals: 18 },
+        "OPNT":  { symbol: "OPNT",  name: "OPN Token",    address: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d", decimals: 18 },
+        "TETE":  { symbol: "TETE",  name: "Tester Tok",   address: "0x771699b159F5DEC9608736DC9C6c901Ddb7Afe3E", decimals: 18 }
     }
-  }
-}
-
-// ===== FETCH ROUTE =====
-async function getRoute(amount) {
-  const res = await fetch("/api/route", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      tokenIn: "OPN",
-      tokenOut: "OPNT",
-      amount
-    })
-  });
-
-  return await res.json();
-}
-
-// ===== MOCK POOL ADDRESS MAP =====
-// (sementara hardcoded, nanti kita dynamic)
-const POOL_MAP = {
-  "OPN/WOPN": "0x1111111111111111111111111111111111111111",
-  "WOPN/OPNT": "0x2222222222222222222222222222222222222222",
-  "OPN/OPNT": "0x3333333333333333333333333333333333333333",
-  "OPN/tBNB": "0x4444444444444444444444444444444444444444",
-  "tBNB/OPNT": "0x5555555555555555555555555555555555555555"
 };
 
-// ===== TOKEN MAP =====
-const TOKEN_MAP = {
-  OPN: "0x0000000000000000000000000000000000000001",
-  WOPN: "0x0000000000000000000000000000000000000002",
-  OPNT: "0x0000000000000000000000000000000000000003",
-  tBNB: "0x0000000000000000000000000000000000000004"
-};
+const ERC20_ABI = ["function balanceOf(address) view returns (uint256)"];
+let provider, signer, account;
 
-// ===== BUILD STEPS =====
-function buildSteps(route, amount) {
-  let steps = [];
-  let currentAmount = ethers.utils.parseUnits(amount.toString(), 18);
+async function connectWallet() {
+    if (!window.ethereum) return alert("Install MetaMask!");
+    
+    try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        account = accounts[0];
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        
+        document.getElementById('wallet-address').innerText = `Wallet: ${account.substring(0,6)}...${account.slice(-4)}`;
+        document.getElementById('btn-connect').innerText = "Connected";
+        
+        await fetchAllBalances();
+    } catch (err) {
+        console.error("User rejected", err);
+    }
+}
 
-  for (let r of route) {
-    const [t0, t1] = r.split("/");
+async function fetchAllBalances() {
+    const balanceContainer = document.getElementById('balance-grid');
+    balanceContainer.innerHTML = "<p>Loading integrity data...</p>";
 
-    steps.push({
-      pool: POOL_MAP[r],
-      tokenIn: TOKEN_MAP[t0],
-      tokenOut: TOKEN_MAP[t1],
-      amountIn: currentAmount
+    const promises = Object.keys(DEX_CONFIG.TOKENS).map(async (key) => {
+        const token = DEX_CONFIG.TOKENS[key];
+        let bal = "0.00";
+        try {
+            if (token.address === "NATIVE") {
+                const raw = await provider.getBalance(account);
+                bal = ethers.utils.formatEther(raw);
+            } else {
+                const contract = new ethers.Contract(token.address, ERC20_ABI, provider);
+                const raw = await contract.balanceOf(account);
+                bal = ethers.utils.formatUnits(raw, token.decimals);
+            }
+        } catch (e) { bal = "Error"; }
+        return { key, bal, name: token.name };
     });
-  }
 
-  return steps;
+    const results = await Promise.all(promises);
+    balanceContainer.innerHTML = ""; // Clear loading
+    
+    results.forEach(res => {
+        balanceContainer.innerHTML += `
+            <div style="background:#111; padding:15px; border-radius:10px; border:1px solid #333;">
+                <small style="color:#666">${res.name}</small>
+                <div style="font-size:1.2rem; font-weight:bold;">${parseFloat(res.bal).toFixed(4)} ${res.key}</div>
+            </div>
+        `;
+    });
 }
 
-// ===== SIMULATION ONLY =====
-async function simulateExecution() {
-  const amount = parseFloat(document.getElementById("amountIn").value);
-
-  const routeData = await getRoute(amount);
-
-  document.getElementById("route").innerText =
-    routeData.route.join(" → ");
-
-  document.getElementById("output").innerText =
-    routeData.expectedOut;
-
-  alert("Simulation OK — Ready for execution");
-}
-
-// ===== EXECUTE (REAL) =====
-async function executeSwap() {
-  const amount = parseFloat(document.getElementById("amountIn").value);
-
-  const routeData = await getRoute(amount);
-
-  const steps = buildSteps(routeData.route, amount);
-
-  const contract = new ethers.Contract(
-    EXECUTOR_ADDRESS,
-    EXECUTOR_ABI,
-    signer
-  );
-
-  const minOut = 0; // nanti kita hitung slippage
-
-  const tx = await contract.executeRoute(
-    steps,
-    minOut,
-    userAddress
-  );
-
-  alert("TX SENT: " + tx.hash);
-
-  await tx.wait();
-
-  alert("SWAP SUCCESS");
-}
+window.connectWallet = connectWallet;
