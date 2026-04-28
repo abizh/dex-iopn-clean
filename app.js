@@ -75,3 +75,37 @@ function executeSwap() {
 window.fetchBalances = fetchBalances;
 window.simulateExecution = simulateExecution;
 window.executeSwap = executeSwap;
+
+// --- FITUR REAL-TIME UPDATE ---
+
+// Fungsi ini memantau aktivitas blockchain secara live
+function setupEventListeners() {
+    if (!window.provider) return;
+
+    console.log("SOP: Monitoring blockchain for balance changes...");
+
+    // 1. Monitor setiap ada blok baru (untuk saldo Native OPN)
+    window.provider.on("block", (blockNumber) => {
+        console.log(`New Block: ${blockNumber} - Updating Native Balance...`);
+        fetchBalances(); 
+    });
+
+    // 2. Monitor aktivitas Wallet (jika ada token masuk/keluar)
+    // Fungsi ini akan mentrigger fetchBalances setiap kali ada event Transfer
+    const filter = {
+        fromBlock: 'latest',
+        address: null, // Memantau semua token yang terdaftar di config
+        topics: [
+            ethers.utils.id("Transfer(address,address,uint256)")
+        ]
+    };
+
+    window.provider.on(filter, (log) => {
+        console.log("Transaction detected! Syncing balances...");
+        // Beri jeda 2 detik agar blockchain selesai memproses state terbaru
+        setTimeout(fetchBalances, 2000); 
+    });
+}
+
+// Update fungsi connectWallet di index.html atau app.js 
+// agar memanggil setupEventListeners() setelah provider siap.
