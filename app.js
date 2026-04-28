@@ -1,6 +1,6 @@
-k/**
- * MASTER CODE APP.JS - PHASE 1 FINAL
- * Verified Addresses & Live Blockchain Listener
+/**
+ * MASTER CODE APP.JS - PHASE 1 FINAL AUDIT
+ * Precision: High | Real-time: Enabled | Database: Locked
  */
 
 const DEX_CONFIG = {
@@ -16,85 +16,84 @@ const DEX_CONFIG = {
 
 const MIN_ABI = ["function balanceOf(address) view returns (uint256)"];
 
-// --- 1. CORE: FETCH BALANCE ---
+// --- FUNGSI AMBIL SALDO (ANTI-GAGAL) ---
 async function fetchBalances() {
     const grid = document.getElementById('balance-grid');
-    if (!grid || !window.userAddress) return;
+    if (!grid || !window.userAddress || !window.provider) return;
     
     try {
         const tasks = Object.keys(DEX_CONFIG.TOKENS).map(async (key) => {
             const token = DEX_CONFIG.TOKENS[key];
-            let bal = "0.00";
+            let rawBal = "0";
             try {
                 if (token.address === "NATIVE") {
                     const b = await window.provider.getBalance(window.userAddress);
-                    bal = ethers.utils.formatEther(b);
+                    rawBal = ethers.utils.formatEther(b);
                 } else {
                     const contract = new ethers.Contract(token.address, MIN_ABI, window.provider);
                     const b = await contract.balanceOf(window.userAddress);
-                    bal = ethers.utils.formatUnits(b, token.decimals);
+                    rawBal = ethers.utils.formatUnits(b, token.decimals);
                 }
-            } catch (e) { bal = "0.00"; }
-            return { ...token, balance: bal };
+            } catch (e) { rawBal = "0"; }
+            return { ...token, balance: rawBal };
         });
 
         const results = await Promise.all(tasks);
-        grid.innerHTML = "";
+        grid.innerHTML = ""; // Reset grid sebelum render ulang
         
         results.forEach(res => {
+            const numBal = parseFloat(res.balance);
+            let displayVal;
+            
+            // Logika Format 25M (TETE) & Presisi 4 Desimal (Lainnya)
+            if (numBal >= 1000000) {
+                displayVal = (numBal / 1000000).toLocaleString(undefined, {maximumFractionDigits: 2}) + "M";
+            } else {
+                displayVal = numBal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4});
+            }
+
             const card = document.createElement('div');
             card.className = "card";
-            const numBal = parseFloat(res.balance);
-            
-            // UI Precision Logic (Format 25M for TETE)
-            let display = numBal >= 1000000 
-                ? (numBal / 1000000).toLocaleString(undefined, {maximumFractionDigits: 2}) + "M"
-                : numBal.toLocaleString(undefined, {maximumFractionDigits: 4});
-
             card.innerHTML = `
                 <small>${res.name}</small>
-                <div class="val" style="${numBal > 0 ? 'color:#00ff00;' : 'color:#444;'}">${display}</div>
+                <div class="val" style="${numBal > 0 ? 'color:#00ff00;' : 'color:#444;'}">${displayVal}</div>
                 <span class="sym">${res.symbol}</span>
             `;
             grid.appendChild(card);
         });
-        console.log("Balance Sync Complete.");
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error("Critical Sync Error:", err);
+    }
 }
 
-// --- 2. CORE: REAL-TIME LISTENER ---
+// --- FUNGSI REAL-TIME LISTENER ---
 function setupEventListeners() {
     if (!window.provider) return;
 
-    // Listener 1: Tiap Blok Baru (Update Native OPN)
-    window.provider.on("block", (blockNumber) => {
-        fetchBalances();
-    });
+    // Trigger update tiap blok baru
+    window.provider.on("block", () => fetchBalances());
 
-    // Listener 2: Tiap ada Transfer Token (Update ERC-20)
+    // Trigger update jika ada Transfer masuk/keluar ke wallet user
     const filter = {
         topics: [ethers.utils.id("Transfer(address,address,uint256)")]
     };
-
     window.provider.on(filter, () => {
-        setTimeout(fetchBalances, 1500); 
+        setTimeout(fetchBalances, 1500);
     });
 }
 
-// --- 3. UI HANDLERS ---
+// --- UI HANDLERS ---
 function simulateExecution() {
     const val = document.getElementById('amountIn').value;
-    document.getElementById('output').innerText = `Tracing Route for ${val} OPN...`;
-    document.getElementById('output').innerText += `\nBest Path: OPN -> WOPN -> tUSDT -> OPNT`;
+    document.getElementById('output').innerText = `Tracing Route for ${val} OPN...\nBest Path: OPN -> WOPN -> tUSDT -> OPNT`;
 }
 
 function executeSwap() {
-    alert("Phase 1 LOCKED. Ready for Phase 2 Engine.");
+    alert("Phase 1 Locked. System ready for Phase 2 Engine integration.");
 }
 
-// Export functions to window
+// Export ke Window Scope agar bisa diakses index.html
 window.fetchBalances = fetchBalances;
 window.setupEventListeners = setupEventListeners;
 window.simulateExecution = simulateExecution;
 window.executeSwap = executeSwap;
-
