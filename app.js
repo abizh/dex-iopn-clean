@@ -140,3 +140,4 @@ function setupEventListeners() {
 window.fetchBalances = fetchBalances;
 window.simulateExecution = simulateExecution;
 window.executeSwap = executeSwap;
+
