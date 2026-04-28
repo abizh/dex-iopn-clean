@@ -1,1 +1,36 @@
-[TEMPEL MASTER CODE INDEX.HTML BARU]
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOPN DEX Optimizer - Phase 1</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0a0a0a; color: #e5e5e5; font-family: sans-serif; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; }
+        .header { margin-bottom: 30px; border-bottom: 1px solid #222; padding-bottom: 15px; text-align: center; }
+        h1 { color: #3b82f6; font-size: 24px; letter-spacing: -1px; }
+        #btn-connect { width: 100%; background: #2563eb; color: white; border: none; padding: 16px; border-radius: 14px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        #btn-connect:hover { background: #1d4ed8; }
+        #wallet-info { margin-top: 12px; font-size: 13px; color: #888; text-align: center; font-family: monospace; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 25px; }
+        .card { background: #171717; padding: 15px; border-radius: 18px; border: 1px solid #262626; }
+        .card small { font-size: 10px; color: #666; text-transform: uppercase; font-weight: bold; }
+        .card .val { font-size: 18px; font-weight: bold; margin: 5px 0; color: #fff; }
+        .card .symbol { font-size: 11px; color: #3b82f6; font-weight: bold; }
+        @media (max-width: 450px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>DEX OPTIMIZER <small style="font-size:10px; color:#444">PHASE 1</small></h1>
+        </div>
+        <button id="btn-connect" onclick="window.connectWallet()">Connect Wallet</button>
+        <div id="wallet-info">Status: Disconnected</div>
+        <div id="balance-grid" class="grid"></div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
