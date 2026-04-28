@@ -1,18 +1,18 @@
 /**
- * MASTER CODE APP.JS - PHASE 3 (EXECUTION LAYER)
- * Status: High Precision | iOPN Testnet Linked
+ * MASTER CODE APP.JS - PHASE 3 FINAL
+ * Standard: Gold Edition | Precision: High
  */
 
-const ROUTER_ADDRESS = "0x8979D19E528148b329431835773199D6aE7e748A"; // Router iOPN
+const ROUTER_ADDR = ethers.utils.getAddress("0x8979D19E528148b329431835773199D6aE7e748A");
 
 const DEX_CONFIG = {
     TOKENS: {
-        "OPN":   { symbol: "OPN",   price: 1.2 },
-        "TETE":  { symbol: "TETE",  price: 0.05, address: "0x771699B159F5DEC9608736DC9C6c901Ddb7Afe3E" },
-        "OPNT":  { symbol: "OPNT",  price: 1.1,  address: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d" },
-        "tUSDT": { symbol: "tUSDT", price: 1.0,  address: "0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b" },
-        "tBNB":  { symbol: "tBNB",  price: 600,  address: "0x92cF36713a5622351c9489D5556B90B321873607" },
-        "WOPN":  { symbol: "WOPN",  price: 1.2,  address: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84" }
+        "OPN":   { symbol: "OPN",   price: 1.2,  address: "NATIVE" },
+        "TETE":  { symbol: "TETE",  price: 0.05, address: ethers.utils.getAddress("0x771699B159F5DEC9608736DC9C6c901Ddb7Afe3E") },
+        "OPNT":  { symbol: "OPNT",  price: 1.1,  address: ethers.utils.getAddress("0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d") },
+        "tUSDT": { symbol: "tUSDT", price: 1.0,  address: ethers.utils.getAddress("0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b") },
+        "tBNB":  { symbol: "tBNB",  price: 600,  address: ethers.utils.getAddress("0x92cF36713a5622351c9489D5556B90B321873607") },
+        "WOPN":  { symbol: "WOPN",  price: 1.2,  address: ethers.utils.getAddress("0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84") }
     }
 };
 
@@ -23,7 +23,6 @@ const FULL_ABI = [
     "function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) returns (uint[] memory amounts)"
 ];
 
-// --- CORE FUNCTIONS ---
 async function fetchBalances() {
     if (!window.userAddress || !window.provider) return;
     const grid = document.getElementById('balance-grid');
@@ -31,11 +30,11 @@ async function fetchBalances() {
         const tasks = Object.keys(DEX_CONFIG.TOKENS).map(async (key) => {
             const token = DEX_CONFIG.TOKENS[key];
             let bal = "0";
-            if (key === "OPN") {
+            if (token.address === "NATIVE") {
                 const b = await window.provider.getBalance(window.userAddress);
                 bal = ethers.utils.formatEther(b);
             } else {
-                const contract = new ethers.Contract(token.address, FULL_ABI, window.provider);
+                const contract = new ethers.Contract(token.address, ["function balanceOf(address) view returns (uint256)"], window.provider);
                 const b = await contract.balanceOf(window.userAddress);
                 bal = ethers.utils.formatUnits(b, 18);
             }
@@ -45,80 +44,71 @@ async function fetchBalances() {
         grid.innerHTML = "";
         results.forEach(res => {
             const num = parseFloat(res.balance);
-            const display = num >= 1000000 ? (num/1000000).toFixed(2)+"M" : num.toFixed(4);
+            const display = num >= 1000000 ? (num/1000000).toFixed(2)+"M" : num.toLocaleString(undefined, {maximumFractionDigits: 4});
             grid.innerHTML += `<div class="card"><small>${res.symbol}</small><div class="val">${display}</div></div>`;
         });
-    } catch (e) { console.error("Balance Sync Failed", e); }
-}
-
-async function executeSwap() {
-    const output = document.getElementById('output');
-    const amountInRaw = document.getElementById('amountIn').value;
-    const tokenInKey = document.getElementById('tokenIn').value;
-    const tokenOutKey = document.getElementById('tokenOut').value;
-    
-    if (!window.provider || amountInRaw <= 0) return;
-
-    const signer = window.provider.getSigner();
-    const amountIn = ethers.utils.parseUnits(amountInRaw.toString(), 18);
-    const tokenIn = DEX_CONFIG.TOKENS[tokenInKey];
-    const tokenOut = DEX_CONFIG.TOKENS[tokenOutKey];
-
-    try {
-        output.innerHTML = `> [STEP 1/2] Checking Allowance for ${tokenInKey}...`;
-        
-        // 1. APPROVE IF NEEDED
-        if (tokenInKey !== "OPN") {
-            const tokenContract = new ethers.Contract(tokenIn.address, FULL_ABI, signer);
-            const allowance = await tokenContract.allowance(window.userAddress, ROUTER_ADDRESS);
-            
-            if (allowance.lt(amountIn)) {
-                output.innerHTML += `<br>> Requesting Permission to spend ${tokenInKey}...`;
-                const txApprove = await tokenContract.approve(ROUTER_ADDRESS, ethers.constants.MaxUint256);
-                await txApprove.wait();
-                output.innerHTML += `<br>> <span style="color:#00ff00;">APPROVAL GRANTED!</span>`;
-            }
-        }
-
-        // 2. SWAP EXECUTION
-        output.innerHTML += `<br>> [STEP 2/2] Executing Swap on iOPN Chain...`;
-        const router = new ethers.Contract(ROUTER_ADDRESS, FULL_ABI, signer);
-        const path = [tokenIn.address, tokenOut.address];
-        const deadline = Math.floor(Date.now() / 1000) + 600; // 10 menit
-
-        // Logika untuk OPN Native akan dipisah di Phase 4, sekarang fokus ke Token-to-Token
-        const txSwap = await router.swapExactTokensForTokens(
-            amountIn,
-            0, // Slippage 0% untuk testnet
-            path,
-            window.userAddress,
-            deadline
-        );
-
-        output.innerHTML += `<br>> TX HASH: <span style="color:#00d4ff;">${txSwap.hash.substring(0,20)}...</span>`;
-        await txSwap.wait();
-        output.innerHTML += `<br>> <span style="color:#00ff00; font-weight:bold;">SWAP SUCCESSFUL!</span>`;
-        
-        fetchBalances(); // Refresh saldo otomatis
-    } catch (err) {
-        output.innerHTML += `<br><span style="color:red;">> FAILED: ${err.reason || err.message}</span>`;
-    }
+    } catch (e) { console.error(e); }
 }
 
 function simulateExecution() {
     const amountIn = document.getElementById('amountIn').value;
-    const tokenIn = document.getElementById('tokenIn').value;
-    const tokenOut = document.getElementById('tokenOut').value;
+    const tokenInKey = document.getElementById('tokenIn').value;
+    const tokenOutKey = document.getElementById('tokenOut').value;
     if (amountIn <= 0) return;
 
-    const pIn = DEX_CONFIG.TOKENS[tokenIn].price;
-    const pOut = DEX_CONFIG.TOKENS[tokenOut].price;
+    const pIn = DEX_CONFIG.TOKENS[tokenInKey].price;
+    const pOut = DEX_CONFIG.TOKENS[tokenOutKey].price;
     const estOut = (amountIn * pIn) / pOut;
     document.getElementById('amountOut').value = estOut.toFixed(6);
+    document.getElementById('output').innerHTML = `> ROUTE: ${tokenInKey} → ${tokenOutKey}<br>> EST: ${estOut.toFixed(4)} ${tokenOutKey}`;
+}
 
-    document.getElementById('output').innerHTML = `> ENGINE READY...<br>> EST. RECEIVE: ${estOut.toFixed(6)} ${tokenOut}<br>> STATUS: VERIFIED`;
+async function executeSwap() {
+    const output = document.getElementById('output');
+    const amountInVal = document.getElementById('amountIn').value;
+    const tIn = DEX_CONFIG.TOKENS[document.getElementById('tokenIn').value];
+    const tOut = DEX_CONFIG.TOKENS[document.getElementById('tokenOut').value];
+    
+    if (tIn.address === "NATIVE") {
+        output.innerHTML = "> <span style='color:orange;'>NATIVE SWAP (PHASE 4) REQUIRED. USE tUSDT FOR TESTING PHASE 3.</span>";
+        return;
+    }
+
+    try {
+        const signer = window.provider.getSigner();
+        const amountInWei = ethers.utils.parseUnits(amountInVal.toString(), 18);
+        const tokenContract = new ethers.Contract(tIn.address, FULL_ABI, signer);
+        
+        output.innerHTML = `> CHECKING ALLOWANCE...`;
+        const allowance = await tokenContract.allowance(window.userAddress, ROUTER_ADDR);
+        
+        if (allowance.lt(amountInWei)) {
+            output.innerHTML += `<br>> APPROVING ${tIn.symbol}...`;
+            const txA = await tokenContract.approve(ROUTER_ADDR, ethers.constants.MaxUint256);
+            await txA.wait();
+            output.innerHTML += `<br>> <span style='color:green;'>APPROVED!</span>`;
+        }
+
+        output.innerHTML += `<br>> EXECUTING SWAP ON-CHAIN...`;
+        const router = new ethers.Contract(ROUTER_ADDR, FULL_ABI, signer);
+        const path = [tIn.address, tOut.address];
+        const deadline = Math.floor(Date.now() / 1000) + 600;
+
+        const txS = await router.swapExactTokensForTokens(amountInWei, 0, path, window.userAddress, deadline);
+        output.innerHTML += `<br>> TX: ${txS.hash.substring(0,15)}...`;
+        await txS.wait();
+        output.innerHTML += `<br>> <span style='color:green; font-weight:bold;'>SWAP SUCCESS!</span>`;
+        fetchBalances();
+    } catch (err) {
+        output.innerHTML += `<br><span style='color:red;'>> ERROR: ${err.reason || "Check Wallet"}</span>`;
+    }
+}
+
+function setupEventListeners() {
+    window.provider.on("block", () => fetchBalances());
 }
 
 window.fetchBalances = fetchBalances;
+window.setupEventListeners = setupEventListeners;
 window.simulateExecution = simulateExecution;
 window.executeSwap = executeSwap;

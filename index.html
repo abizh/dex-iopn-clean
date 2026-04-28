@@ -3,206 +3,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DEX OPTIMIZER - GOLD EDITION</title>
+  <title>DEX OPTIMIZER - GOLD EDITION V1</title>
   <style>
     :root {
       --gold-gradient: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
       --dark-bg: #05070a;
       --card-bg: #10141b;
-      --gold-glow: 0 0 15px rgba(191, 149, 63, 0.3);
     }
-
-    body { 
-      background: var(--dark-bg); 
-      color: #e0e0e0; 
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-    }
-
-    /* Header & Wallet Section */
-    .header {
-      width: 100%;
-      max-width: 450px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 25px;
-    }
-
-    h2 { 
-      font-size: 16px; 
-      letter-spacing: 2px; 
-      background: var(--gold-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
-
-    .btn-connect { 
-      background: var(--gold-gradient); 
-      color: #000; 
-      padding: 8px 16px; 
-      cursor: pointer; 
-      border: none; 
-      border-radius: 20px; 
-      font-weight: bold; 
-      font-size: 12px;
-      box-shadow: var(--gold-glow);
-      transition: 0.3s;
-    }
-
-    /* Balance Grid */
-    .grid { 
-      display: grid; 
-      grid-template-columns: repeat(2, 1fr); 
-      gap: 12px; 
-      width: 100%;
-      max-width: 450px;
-      margin-bottom: 25px; 
-    }
-
-    .card { 
-      background: var(--card-bg); 
-      border: 1px solid #2a2110; 
-      padding: 12px; 
-      border-radius: 15px; 
-      position: relative;
-      overflow: hidden;
-    }
-
-    .card::after {
-      content: "";
-      position: absolute;
-      top: 0; left: 0; width: 4px; height: 100%;
-      background: var(--gold-gradient);
-    }
-
-    .card small { font-size: 10px; color: #888; text-transform: uppercase; }
-    .card .val { font-size: 15px; font-weight: bold; color: #fcf6ba; margin-top: 4px; }
-
-    /* Swap Container */
-    .swap-container { 
-      background: var(--card-bg); 
-      border: 1px solid #2a2110; 
-      padding: 20px; 
-      border-radius: 24px; 
-      width: 100%;
-      max-width: 400px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-
-    .input-group {
-      background: #05070a;
-      padding: 15px;
-      border-radius: 16px;
-      border: 1px solid #1c1c1c;
-      margin-bottom: 8px;
-    }
-
-    .input-group label { font-size: 11px; color: #888; display: block; margin-bottom: 8px; }
-
+    body { background: var(--dark-bg); color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; padding: 20px; min-height: 100vh; }
+    .header { width: 100%; max-width: 450px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+    h2 { font-size: 16px; letter-spacing: 2px; background: var(--gold-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; font-weight: 800; }
+    .btn-connect { background: var(--gold-gradient); color: #000; padding: 8px 16px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; font-size: 11px; box-shadow: 0 0 10px rgba(191,149,63,0.4); }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 450px; margin-bottom: 20px; }
+    .card { background: var(--card-bg); border: 1px solid #2a2110; padding: 12px; border-radius: 12px; border-left: 3px solid #bf953f; }
+    .card small { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+    .card .val { font-size: 14px; font-weight: bold; color: #fcf6ba; margin-top: 2px; }
+    .swap-container { background: var(--card-bg); border: 1px solid #2a2110; padding: 20px; border-radius: 24px; width: 100%; max-width: 400px; box-shadow: 0 10px 40px rgba(0,0,0,0.7); }
+    .input-group { background: #000; padding: 15px; border-radius: 16px; border: 1px solid #1c1c1c; margin-bottom: 5px; }
+    .input-group label { font-size: 10px; color: #666; display: block; margin-bottom: 5px; }
     .input-row { display: flex; justify-content: space-between; align-items: center; }
-
-    input { 
-      background: transparent; 
-      border: none; 
-      color: white; 
-      font-size: 20px; 
-      font-weight: bold; 
-      width: 60%;
-      outline: none;
-    }
-
-    select {
-      background: #1a1f26;
-      color: #fcf6ba;
-      border: 1px solid #bf953f;
-      padding: 5px 10px;
-      border-radius: 8px;
-      font-weight: bold;
-    }
-
-    .divider {
-      text-align: center;
-      margin: -15px 0;
-      position: relative;
-      z-index: 2;
-    }
-
-    .arrow-down {
-      background: var(--dark-bg);
-      border: 1px solid #bf953f;
-      color: #bf953f;
-      width: 30px;
-      height: 30px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      font-size: 14px;
-    }
-
-    .btn-swap {
-      width: 100%;
-      padding: 15px;
-      margin-top: 20px;
-      background: var(--gold-gradient);
-      border: none;
-      border-radius: 16px;
-      color: #000;
-      font-weight: bold;
-      font-size: 16px;
-      cursor: pointer;
-      box-shadow: var(--gold-glow);
-    }
-
-    /* Log Terminal */
-    .output-log { 
-      margin-top: 20px;
-      background: #000; 
-      border: 1px solid #2a2110; 
-      padding: 12px; 
-      border-radius: 12px; 
-      font-family: 'Courier New', monospace; 
-      font-size: 11px; 
-      color: #bf953f; 
-      width: 100%;
-      max-width: 420px;
-    }
+    input { background: transparent; border: none; color: white; font-size: 18px; font-weight: bold; width: 60%; outline: none; }
+    select { background: #111; color: #fcf6ba; border: 1px solid #333; padding: 5px; border-radius: 5px; font-size: 12px; }
+    .divider { text-align: center; margin: -12px 0; position: relative; z-index: 5; }
+    .arrow-down { background: #000; border: 1px solid #bf953f; color: #bf953f; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 12px; }
+    .btn-swap { width: 100%; padding: 15px; margin-top: 15px; background: var(--gold-gradient); border: none; border-radius: 16px; color: #000; font-weight: bold; font-size: 14px; cursor: pointer; text-transform: uppercase; }
+    .output-log { margin-top: 20px; background: #000; border: 1px solid #222; padding: 12px; border-radius: 10px; font-family: 'Courier New', monospace; font-size: 10px; color: #bf953f; width: 100%; max-width: 420px; line-height: 1.4; min-height: 60px; }
   </style>
 </head>
 <body>
 
   <div class="header">
     <h2>GOLD OPTIMIZER</h2>
-    <button id="btnConnect" class="btn-connect" onclick="connectWallet()">CONNECT</button>
+    <button id="btnConnect" class="btn-connect" onclick="connectWallet()">CONNECT WALLET</button>
   </div>
 
-  <div id="balance-grid" class="grid">
-    </div>
+  <div id="balance-grid" class="grid"></div>
 
   <div class="swap-container">
     <div class="input-group">
-        <label>You Sell</label>
+        <label>SELL</label>
         <div class="input-row">
-            <input id="amountIn" type="number" value="10" oninput="simulateExecution()">
+            <input id="amountIn" type="number" value="1" oninput="simulateExecution()">
             <select id="tokenIn" onchange="simulateExecution()">
-                <option value="OPN">OPN</option>
                 <option value="tUSDT">tUSDT</option>
+                <option value="OPN">OPN</option>
             </select>
         </div>
     </div>
-
-    <div class="divider">
-        <div class="arrow-down">↓</div>
-    </div>
-
-    <div class="input-group" style="margin-top: 8px;">
-        <label>You Get (Estimate)</label>
+    <div class="divider"><div class="arrow-down">↓</div></div>
+    <div class="input-group">
+        <label>BUY (ESTIMATE)</label>
         <div class="input-row">
             <input id="amountOut" type="text" placeholder="0.00" readonly>
             <select id="tokenOut" onchange="simulateExecution()">
@@ -212,8 +62,7 @@
             </select>
         </div>
     </div>
-
-    <button class="btn-swap" onclick="executeSwap()">SWAP ASSETS</button>
+    <button class="btn-swap" onclick="executeSwap()">CONFIRM SWAP</button>
   </div>
 
   <div id="output" class="output-log">> SYSTEM: Awaiting secure connection...</div>
@@ -228,17 +77,12 @@
           const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
           window.userAddress = accounts[0];
           window.provider = new ethers.providers.Web3Provider(window.ethereum);
-          
-          document.getElementById('btnConnect').innerText = window.userAddress.substring(0,6) + "..." + window.userAddress.substring(38);
-          document.getElementById('btnConnect').style.background = "transparent";
-          document.getElementById('btnConnect').style.border = "1px solid #bf953f";
-          document.getElementById('btnConnect').style.color = "#bf953f";
-
+          document.getElementById('btnConnect').innerText = window.userAddress.substring(0,6)+"..."+window.userAddress.substring(38);
           if (window.fetchBalances) window.fetchBalances();
           if (window.setupEventListeners) window.setupEventListeners();
           simulateExecution();
         } catch (err) { document.getElementById('output').innerText = "> ERR: " + err.message; }
-      } else { alert("Install Mises/MetaMask!"); }
+      } else { alert("Please use Mises/MetaMask Browser!"); }
     }
   </script>
 </body>
