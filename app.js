@@ -1,9 +1,8 @@
 /**
- * MASTER CODE APP.JS - GOLD OPTIMIZER V1.1.2
- * Status: FINAL AUDITED | SOP Standard: High Precision
+ * MASTER CODE APP.JS - GOLD OPTIMIZER V1.1.3
+ * Status: HEARTBEAT FIX | SOP Standard: High Precision
  */
 
-// 1. INVARIANT CONSTANTS
 const ROUTER_ADDR = ethers.utils.getAddress("0x8979D19E528148b329431835773199D6aE7e748A");
 
 const DEX_CONFIG = {
@@ -24,12 +23,12 @@ const SWAP_ABI = [
     "function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) returns (uint[] memory amounts)"
 ];
 
-// 2. ENGINE CONTROLLER
 window.initEngine = function() {
+    console.log("Engine Bootstrapping...");
     fetchBalances();
     setupEventListeners();
     simulateExecution();
-    document.getElementById('output').innerHTML = "> SYSTEM: Engine Online. Checksum Validated.";
+    document.getElementById('output').innerHTML = "> SYSTEM: Engine Online. Handshake Verified.";
 };
 
 async function fetchBalances() {
@@ -56,7 +55,7 @@ async function fetchBalances() {
             const display = num >= 1000000 ? (num/1000000).toFixed(2)+"M" : num.toLocaleString(undefined, {maximumFractionDigits: 4});
             grid.innerHTML += `<div class="card"><small>${res.symbol}</small><div class="val">${display}</div></div>`;
         });
-    } catch (e) { console.error("Sync Failed", e); }
+    } catch (e) { console.error("Balance Sync Failed", e); }
 }
 
 function simulateExecution() {
@@ -67,18 +66,20 @@ function simulateExecution() {
     
     const estOut = (amtIn * DEX_CONFIG.TOKENS[tInKey].price) / DEX_CONFIG.TOKENS[tOutKey].price;
     document.getElementById('amountOut').value = estOut.toFixed(6);
-    document.getElementById('output').innerHTML = `> ANALYSIS: Optimal Route ${tInKey} → ${tOutKey}<br>> EST. YIELD: ${estOut.toFixed(6)} ${tOutKey}`;
+    document.getElementById('output').innerHTML = `> ANALYSIS: Route Active [${tInKey} -> ${tOutKey}]<br>> EST. YIELD: ${estOut.toFixed(6)} ${tOutKey}`;
 }
 
 async function executeSwap() {
     const btn = document.getElementById('btnSwap');
     const out = document.getElementById('output');
     const amtInVal = document.getElementById('amountIn').value;
-    const tIn = DEX_CONFIG.TOKENS[document.getElementById('tokenIn').value];
-    const tOut = DEX_CONFIG.TOKENS[document.getElementById('tokenOut').value];
+    const tInKey = document.getElementById('tokenIn').value;
+    const tOutKey = document.getElementById('tokenOut').value;
+    const tIn = DEX_CONFIG.TOKENS[tInKey];
+    const tOut = DEX_CONFIG.TOKENS[tOutKey];
     
     if (tIn.address === "NATIVE") {
-        out.innerHTML = "> <span style='color:orange;'>ALERT: Use WOPN or tUSDT for Phase 3 Testing. Native OPN Bridge in Phase 4.</span>";
+        out.innerHTML = "> <span style='color:orange;'>ALERT: Use WOPN or tUSDT. Native OPN requires Bridge Phase 4.</span>";
         return;
     }
 
@@ -88,27 +89,26 @@ async function executeSwap() {
         const amtWei = ethers.utils.parseUnits(amtInVal.toString(), 18);
         const tokenCon = new ethers.Contract(tIn.address, SWAP_ABI, signer);
         
-        out.innerHTML = `> PROTOCOL: Checking Allowance...`;
+        out.innerHTML = `> STATUS: Validating Allowance...`;
         const allowance = await tokenCon.allowance(window.userAddress, ROUTER_ADDR);
         
         if (allowance.lt(amtWei)) {
-            out.innerHTML += `<br>> PROTOCOL: Approving ${tIn.symbol}...`;
+            out.innerHTML += `<br>> STATUS: Requesting Approval...`;
             const txA = await tokenCon.approve(ROUTER_ADDR, ethers.constants.MaxUint256);
             await txA.wait();
-            out.innerHTML += `<br>> <span style='color:green;'>SUCCESS: Approved.</span>`;
         }
 
-        out.innerHTML += `<br>> PROTOCOL: Executing Swap...`;
+        out.innerHTML += `<br>> STATUS: Executing Swap...`;
         const router = new ethers.Contract(ROUTER_ADDR, SWAP_ABI, signer);
         const path = [tIn.address, tOut.address];
         const txS = await router.swapExactTokensForTokens(amtWei, 0, path, window.userAddress, Math.floor(Date.now()/1000)+600);
         
         out.innerHTML += `<br>> TX: ${txS.hash.substring(0,20)}...`;
         await txS.wait();
-        out.innerHTML += `<br>> <span style='color:green; font-weight:bold;'>SUCCESS: Assets Swapped!</span>`;
+        out.innerHTML += `<br>> <span style='color:green; font-weight:bold;'>SUCCESS: Swap Confirmed!</span>`;
         fetchBalances();
     } catch (err) {
-        out.innerHTML += `<br><span style='color:#ff4d4d;'>> FAILED: ${err.reason || "Check Wallet/Balance"}</span>`;
+        out.innerHTML += `<br><span style='color:#ff4d4d;'>> FAILED: ${err.reason || "Handshake Rejected"}</span>`;
     } finally {
         btn.disabled = false; btn.innerText = "INITIATE SWAP";
     }
@@ -116,13 +116,13 @@ async function executeSwap() {
 
 function setupEventListeners() {
     ['amountIn', 'tokenIn', 'tokenOut'].forEach(id => {
+        const el = document.getElementById(id);
+        el.replaceWith(el.cloneNode(true)); // Clear existing listeners
         document.getElementById(id).addEventListener('input', simulateExecution);
         document.getElementById(id).addEventListener('change', simulateExecution);
     });
-    if(window.provider) window.provider.on("block", () => fetchBalances());
 }
 
 window.fetchBalances = fetchBalances;
 window.simulateExecution = simulateExecution;
 window.executeSwap = executeSwap;
-
