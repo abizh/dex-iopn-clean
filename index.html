@@ -3,23 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DEX OPTIMIZER - PHASE 1 LIVE</title>
+  <title>DEX OPTIMIZER - PHASE 2 ENGINE</title>
   <style>
     body { background:#0b0f14; color:white; font-family:sans-serif; padding:20px; }
     h2 { color:#00d4ff; border-bottom: 1px solid #333; padding-bottom:10px; text-transform: uppercase; letter-spacing: 1px; font-size: 18px; }
-    .btn-connect { background:#ffffff; color:#000; padding:12px 20px; cursor:pointer; border:none; border-radius:10px; font-weight:bold; width: 100%; max-width:250px; margin-bottom:10px; transition: 0.3s; }
+    .btn-connect { background:#ffffff; color:#000; padding:12px 20px; cursor:pointer; border:none; border-radius:10px; font-weight:bold; width: 100%; max-width:250px; margin-bottom:10px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
     .card { background: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 12px; text-align: center; border-left: 4px solid #3b82f6; }
-    .card small { font-size: 10px; color: #888; display: block; margin-bottom: 5px; text-transform: uppercase; }
+    .card small { font-size: 10px; color: #888; display: block; margin-bottom: 5px; }
     .card .val { font-size: 16px; font-weight: bold; color: #00ff00; }
-    .card .sym { font-size: 11px; color: #00d4ff; font-weight: bold; }
-    .status-box { background:#161b22; border:1px solid #30363d; padding:15px; border-radius:8px; margin-top:10px; font-family:monospace; font-size:12px; }
-    input { background:#1a1f26; border:1px solid #444; color:white; padding:10px; border-radius:5px; width:80px; text-align: center; }
+    .status-box { background:#161b22; border:1px solid #30363d; padding:20px; border-radius:12px; margin-top:10px; }
+    .swap-row { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; background: #0b0f14; padding: 10px; border-radius: 8px; border: 1px solid #333; }
+    select, input { background: transparent; border: none; color: white; font-weight: bold; outline: none; flex: 1; }
+    .output-log { background:#000; border:1px solid #333; padding:15px; border-radius:8px; margin-top:15px; font-family:monospace; font-size:11px; color:#00ff00; min-height: 80px; line-height: 1.5; }
   </style>
 </head>
 <body>
 
-  <h2>DEX OPTIMIZER (PHASE 1)</h2>
+  <h2>DEX OPTIMIZER (PHASE 2)</h2>
 
   <button id="btnConnect" class="btn-connect" onclick="connectWallet()">CONNECT WALLET</button>
   <div id="wallet" style="color:#555; font-size:11px; margin-bottom:20px; font-family:monospace;">Status: Disconnected</div>
@@ -27,13 +28,32 @@
   <div id="balance-grid" class="grid"></div>
 
   <div class="status-box">
-    <label>Amount In:</label> 
-    <input id="amountIn" type="number" value="10">
-    <div style="margin-top:15px; display:flex; gap:10px;">
-        <button onclick="simulateExecution()" style="flex:1; padding:10px; background:#28a745; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">SIMULATE</button>
-        <button onclick="executeSwap()" style="flex:1; padding:10px; background:#3b82f6; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">EXECUTE</button>
+    <div class="swap-row">
+        <input id="amountIn" type="number" value="10" oninput="simulateExecution()">
+        <select id="tokenIn" onchange="simulateExecution()">
+            <option value="OPN">OPN</option>
+            <option value="tUSDT">tUSDT</option>
+            <option value="WOPN">WOPN</option>
+        </select>
     </div>
-    <div id="output" style="margin-top:15px; color:#abb2bf; border-top:1px solid #333; padding-top:10px; min-height: 40px;">Ready for sync...</div>
+
+    <div style="text-align:center; margin:-5px 0 10px; color:#3b82f6; font-size:18px;">⬇</div>
+
+    <div class="swap-row" style="border-color: #3b82f6;">
+        <input id="amountOut" type="text" placeholder="Result" readonly>
+        <select id="tokenOut" onchange="simulateExecution()">
+            <option value="TETE">TETE</option>
+            <option value="OPNT">OPNT</option>
+            <option value="tBNB">tBNB</option>
+        </select>
+    </div>
+
+    <div style="margin-top:20px; display:flex; gap:10px;">
+        <button onclick="simulateExecution()" style="flex:1; padding:12px; background:#161b22; color:#00d4ff; border:1px solid #00d4ff; border-radius:8px; cursor:pointer; font-weight:bold;">RE-CALCULATE</button>
+        <button onclick="executeSwap()" style="flex:1; padding:12px; background:#3b82f6; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">SWAP NOW</button>
+    </div>
+
+    <div id="output" class="output-log">> Initializing Routing Engine... Ready.</div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
@@ -46,19 +66,13 @@
           const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
           window.userAddress = accounts[0];
           window.provider = new ethers.providers.Web3Provider(window.ethereum);
-          
           document.getElementById('wallet').innerText = "Linked: " + window.userAddress;
           document.getElementById('btnConnect').innerText = "WALLET LIVE ✅";
           document.getElementById('btnConnect').style.background = "#28a745";
-          document.getElementById('btnConnect').style.color = "#fff";
-
           if (window.fetchBalances) window.fetchBalances();
           if (window.setupEventListeners) window.setupEventListeners();
-
-          document.getElementById('output').innerText = "System: Blockchain Listener Active.";
-        } catch (err) {
-          document.getElementById('output').innerText = "Err: " + err.message;
-        }
+          simulateExecution(); // Auto-calculate on connect
+        } catch (err) { document.getElementById('output').innerText = "> Err: " + err.message; }
       } else { alert("Please use MetaMask/Mises Browser!"); }
     }
   </script>
