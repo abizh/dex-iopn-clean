@@ -1,36 +1,95 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iOPN DEX Optimizer - Phase 1</title>
-    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0a0a0a; color: #e5e5e5; font-family: sans-serif; padding: 20px; }
-        .container { max-width: 500px; margin: 0 auto; }
-        .header { margin-bottom: 30px; border-bottom: 1px solid #222; padding-bottom: 15px; text-align: center; }
-        h1 { color: #3b82f6; font-size: 24px; letter-spacing: -1px; }
-        #btn-connect { width: 100%; background: #2563eb; color: white; border: none; padding: 16px; border-radius: 14px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        #btn-connect:hover { background: #1d4ed8; }
-        #wallet-info { margin-top: 12px; font-size: 13px; color: #888; text-align: center; font-family: monospace; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 25px; }
-        .card { background: #171717; padding: 15px; border-radius: 18px; border: 1px solid #262626; }
-        .card small { font-size: 10px; color: #666; text-transform: uppercase; font-weight: bold; }
-        .card .val { font-size: 18px; font-weight: bold; margin: 5px 0; color: #fff; }
-        .card .symbol { font-size: 11px; color: #3b82f6; font-weight: bold; }
-        @media (max-width: 450px) { .grid { grid-template-columns: 1fr; } }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DEX ROUTE OPTIMIZER - PHASE 1</title>
+  <style>
+    body { background:#0b0f14; color:white; font-family:sans-serif; padding:20px; line-height:1.6; }
+    h2 { color:#00d4ff; border-bottom: 1px solid #333; padding-bottom:10px; margin-bottom: 20px; }
+    
+    /* Tombol & Input Style */
+    button { padding:12px 20px; cursor:pointer; border:none; border-radius:8px; font-weight:bold; transition: 0.3s; margin-bottom: 10px; }
+    .btn-connect { background:#ffffff; color:#000; width: 100%; max-width:250px; }
+    .btn-simulate { background:#28a745; color:white; flex: 1; }
+    .btn-execute { background:#007bff; color:white; flex: 1; }
+    
+    #wallet { color:#888; font-family:monospace; margin-bottom:20px; font-size: 13px; }
+    
+    /* Balance Grid Inovasi */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
+    .card { background: #161b22; border: 1px solid #30363d; padding: 12px; border-radius: 10px; text-align: center; }
+    .card small { font-size: 10px; color: #555; display: block; text-transform: uppercase; }
+    .card .val { font-size: 16px; font-weight: bold; margin: 5px 0; color: #00ff00; }
+    .card .sym { font-size: 11px; color: #00d4ff; font-weight: bold; }
+
+    .status-box { background:#161b22; border:1px solid #30363d; padding:15px; border-radius:8px; margin-top:10px; }
+    input { background:#1a1f26; border:1px solid #444; color:white; padding:10px; border-radius:5px; width:100%; max-width:100px; margin-bottom:15px; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>DEX OPTIMIZER <small style="font-size:10px; color:#444">PHASE 1</small></h1>
-        </div>
-        <button id="btn-connect" onclick="window.connectWallet()">Connect Wallet</button>
-        <div id="wallet-info">Status: Disconnected</div>
-        <div id="balance-grid" class="grid"></div>
+
+  <h2>DEX ROUTE OPTIMIZER (PHASE 1)</h2>
+
+  <button id="btnConnect" class="btn-connect" onclick="connectWallet()">CONNECT WALLET</button>
+  <div id="wallet">Status: Not Connected</div>
+
+  <div id="balance-grid" class="grid">
     </div>
-    <script src="app.js"></script>
+
+  <div class="status-box">
+    <label>Amount In:</label>
+    <input id="amountIn" type="number" value="10" />
+    <div style="display:flex; gap:10px; margin-top:10px;">
+      <button class="btn-simulate" onclick="simulateExecution()">SIMULATE</button>
+      <button class="btn-execute" onclick="executeSwap()">EXECUTE (REAL)</button>
+    </div>
+  </div>
+
+  <div class="status-box">
+    <strong>Best Route:</strong>
+    <div id="route" style="color:#00ff00;">-</div>
+  </div>
+
+  <div class="status-box">
+    <strong>Output Log:</strong>
+    <div id="output" style="font-family:monospace; font-size:12px; color:#abb2bf;">-</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  
+  <script>
+    async function connectWallet() {
+      if (typeof window.ethereum !== 'undefined') {
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          const account = accounts[0];
+          
+          document.getElementById('wallet').innerText = "Status: Connected (" + account.substring(0,6) + "..." + account.substring(38) + ")";
+          document.getElementById('btnConnect').innerText = "WALLET CONNECTED";
+          document.getElementById('btnConnect').style.background = "#28a745";
+          document.getElementById('btnConnect').style.color = "#fff";
+
+          // Stabilitas Global Provider
+          window.provider = new ethers.providers.Web3Provider(window.ethereum);
+          window.signer = window.provider.getSigner();
+          window.userAddress = account;
+          
+          // Panggil fungsi fetch saldo di app.js
+          if (typeof fetchBalances === "function") {
+            fetchBalances();
+          }
+          
+          console.log("SOP Check: Wallet Linked & Syncing Balance");
+        } catch (err) {
+          console.error("Connection Error:", err);
+          document.getElementById('output').innerText = "Error: " + err.message;
+        }
+      } else {
+        alert("Wallet Not Detected. Please use a Web3 Browser.");
+      }
+    }
+  </script>
+  <script src="app.js"></script>
 </body>
 </html>

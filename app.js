@@ -1,6 +1,6 @@
 /**
  * MASTER CODE APP.JS - PHASE 1
- * Audit: Mobile Compatible, iOPN Testnet Linked
+ * Kombinasi Stabilitas Koneksi & UI Balance
  */
 
 const DEX_CONFIG = {
@@ -15,60 +15,59 @@ const DEX_CONFIG = {
 };
 
 const MIN_ABI = ["function balanceOf(address) view returns (uint256)"];
-let provider, account;
-
-async function connectWallet() {
-    if (typeof window.ethereum === 'undefined') {
-        return alert("Gunakan Mises Browser atau Metamask Mobile!");
-    }
-    try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        account = accounts[0];
-        provider = new ethers.providers.Web3Provider(window.ethereum);
-        
-        document.getElementById('btn-connect').innerText = "Connected ✅";
-        document.getElementById('btn-connect').style.background = "#064e3b";
-        document.getElementById('wallet-info').innerHTML = `Wallet: <b>${account.substring(0,6)}...${account.slice(-4)}</b>`;
-        
-        await fetchBalances();
-    } catch (error) {
-        console.error(error);
-        alert("Gagal konek wallet.");
-    }
-}
 
 async function fetchBalances() {
     const grid = document.getElementById('balance-grid');
-    grid.innerHTML = "<p style='grid-column:1/-1; text-align:center;'>Syncing Blockchain...</p>";
+    if (!grid) return;
+    
+    grid.innerHTML = "<p style='grid-column:1/-1; font-size:12px;'>Fetching Assets...</p>";
 
-    const tasks = Object.keys(DEX_CONFIG.TOKENS).map(async (key) => {
-        const token = DEX_CONFIG.TOKENS[key];
-        let balance = "0.00";
-        try {
-            if (token.address === "NATIVE") {
-                const b = await provider.getBalance(account);
-                balance = ethers.utils.formatEther(b);
-            } else {
-                const contract = new ethers.Contract(token.address, MIN_ABI, provider);
-                const b = await contract.balanceOf(account);
-                balance = ethers.utils.formatUnits(b, token.decimals);
-            }
-        } catch (e) { balance = "0.00"; }
-        return { ...token, balance };
-    });
+    try {
+        const tasks = Object.keys(DEX_CONFIG.TOKENS).map(async (key) => {
+            const token = DEX_CONFIG.TOKENS[key];
+            let bal = "0.00";
+            try {
+                if (token.address === "NATIVE") {
+                    const b = await window.provider.getBalance(window.userAddress);
+                    bal = ethers.utils.formatEther(b);
+                } else {
+                    const contract = new ethers.Contract(token.address, MIN_ABI, window.provider);
+                    const b = await contract.balanceOf(window.userAddress);
+                    bal = ethers.utils.formatUnits(b, token.decimals);
+                }
+            } catch (e) { bal = "0.00"; }
+            return { ...token, balance: bal };
+        });
 
-    const results = await Promise.all(tasks);
-    grid.innerHTML = "";
-    results.forEach(res => {
-        const card = document.createElement('div');
-        card.className = "card";
-        card.innerHTML = `
-            <small>${res.name}</small>
-            <div class="val">${parseFloat(res.balance).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-            <span class="symbol">${res.symbol}</span>
-        `;
-        grid.appendChild(card);
-    });
+        const results = await Promise.all(tasks);
+        grid.innerHTML = "";
+        
+        results.forEach(res => {
+            const card = document.createElement('div');
+            card.className = "card";
+            card.innerHTML = `
+                <small>${res.name}</small>
+                <div class="val">${parseFloat(res.balance).toFixed(2)}</div>
+                <span class="sym">${res.symbol}</span>
+            `;
+            grid.appendChild(card);
+        });
+    } catch (err) {
+        console.error("Fetch Error:", err);
+    }
 }
 
-window.connectWallet = connectWallet;
+// Placeholder untuk fitur selanjutnya (Phase 2)
+function simulateExecution() {
+    document.getElementById('output').innerText = "Simulation Mode: Calculating Best Route...";
+    document.getElementById('route').innerText = "OPN -> tUSDT -> OPNT";
+}
+
+function executeSwap() {
+    alert("Execute feature is locked. Complete Phase 1 first!");
+}
+
+// Ekspos ke window
+window.fetchBalances = fetchBalances;
+window.simulateExecution = simulateExecution;
+window.executeSwap = executeSwap;
