@@ -1,6 +1,6 @@
-/**
+k/**
  * MASTER CODE APP.JS - PHASE 1 FINAL
- * Verified Addresses: TETE, OPNT, tUSDT, tBNB, WOPN
+ * Verified Addresses & Live Blockchain Listener
  */
 
 const DEX_CONFIG = {
@@ -16,11 +16,11 @@ const DEX_CONFIG = {
 
 const MIN_ABI = ["function balanceOf(address) view returns (uint256)"];
 
+// --- 1. CORE: FETCH BALANCE ---
 async function fetchBalances() {
     const grid = document.getElementById('balance-grid');
-    if (!grid) return;
-    grid.innerHTML = "<p style='grid-column:1/-1; text-align:center; font-size:12px; color:#00d4ff;'>🔄 Data Syncing...</p>";
-
+    if (!grid || !window.userAddress) return;
+    
     try {
         const tasks = Object.keys(DEX_CONFIG.TOKENS).map(async (key) => {
             const token = DEX_CONFIG.TOKENS[key];
@@ -46,7 +46,7 @@ async function fetchBalances() {
             card.className = "card";
             const numBal = parseFloat(res.balance);
             
-            // Format Display
+            // UI Precision Logic (Format 25M for TETE)
             let display = numBal >= 1000000 
                 ? (numBal / 1000000).toLocaleString(undefined, {maximumFractionDigits: 2}) + "M"
                 : numBal.toLocaleString(undefined, {maximumFractionDigits: 4});
@@ -58,54 +58,43 @@ async function fetchBalances() {
             `;
             grid.appendChild(card);
         });
-        document.getElementById('output').innerText = "System Audit: Data Integrity Confirmed.";
+        console.log("Balance Sync Complete.");
     } catch (err) { console.error(err); }
 }
 
+// --- 2. CORE: REAL-TIME LISTENER ---
+function setupEventListeners() {
+    if (!window.provider) return;
+
+    // Listener 1: Tiap Blok Baru (Update Native OPN)
+    window.provider.on("block", (blockNumber) => {
+        fetchBalances();
+    });
+
+    // Listener 2: Tiap ada Transfer Token (Update ERC-20)
+    const filter = {
+        topics: [ethers.utils.id("Transfer(address,address,uint256)")]
+    };
+
+    window.provider.on(filter, () => {
+        setTimeout(fetchBalances, 1500); 
+    });
+}
+
+// --- 3. UI HANDLERS ---
 function simulateExecution() {
     const val = document.getElementById('amountIn').value;
-    document.getElementById('output').innerText = `Simulating Path for ${val} OPN...`;
+    document.getElementById('output').innerText = `Tracing Route for ${val} OPN...`;
     document.getElementById('output').innerText += `\nBest Path: OPN -> WOPN -> tUSDT -> OPNT`;
 }
 
 function executeSwap() {
-    alert("Phase 1 LOCKED. Proceed to Phase 2 (Router Logic)?");
+    alert("Phase 1 LOCKED. Ready for Phase 2 Engine.");
 }
 
+// Export functions to window
 window.fetchBalances = fetchBalances;
+window.setupEventListeners = setupEventListeners;
 window.simulateExecution = simulateExecution;
 window.executeSwap = executeSwap;
 
-// --- FITUR REAL-TIME UPDATE ---
-
-// Fungsi ini memantau aktivitas blockchain secara live
-function setupEventListeners() {
-    if (!window.provider) return;
-
-    console.log("SOP: Monitoring blockchain for balance changes...");
-
-    // 1. Monitor setiap ada blok baru (untuk saldo Native OPN)
-    window.provider.on("block", (blockNumber) => {
-        console.log(`New Block: ${blockNumber} - Updating Native Balance...`);
-        fetchBalances(); 
-    });
-
-    // 2. Monitor aktivitas Wallet (jika ada token masuk/keluar)
-    // Fungsi ini akan mentrigger fetchBalances setiap kali ada event Transfer
-    const filter = {
-        fromBlock: 'latest',
-        address: null, // Memantau semua token yang terdaftar di config
-        topics: [
-            ethers.utils.id("Transfer(address,address,uint256)")
-        ]
-    };
-
-    window.provider.on(filter, (log) => {
-        console.log("Transaction detected! Syncing balances...");
-        // Beri jeda 2 detik agar blockchain selesai memproses state terbaru
-        setTimeout(fetchBalances, 2000); 
-    });
-}
-
-// Update fungsi connectWallet di index.html atau app.js 
-// agar memanggil setupEventListeners() setelah provider siap.

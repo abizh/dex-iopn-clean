@@ -10,7 +10,8 @@
     button { padding:12px 20px; cursor:pointer; border:none; border-radius:10px; font-weight:bold; transition: 0.3s; margin-bottom: 10px; }
     .btn-connect { background:#ffffff; color:#000; width: 100%; max-width:250px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
-    .card { background: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 12px; text-align: center; border-left: 3px solid #3b82f6; }
+    .card { background: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 12px; text-align: center; border-left: 3px solid #3b82f6; transition: 0.3s; }
+    .card:hover { border-color: #00ff00; background: #1c2128; }
     .card small { font-size: 10px; color: #555; display: block; margin-bottom: 5px; font-weight: bold; }
     .card .val { font-size: 16px; font-weight: bold; color: #00ff00; margin-bottom: 2px; }
     .card .sym { font-size: 11px; color: #00d4ff; font-weight: bold; }
@@ -39,7 +40,7 @@
 
   <div class="status-box">
     <strong>Output Log:</strong>
-    <div id="output" style="font-family:monospace; font-size:11px; color:#abb2bf; margin-top:5px;">System: Ready for Phase 2.</div>
+    <div id="output" style="font-family:monospace; font-size:11px; color:#abb2bf; margin-top:5px;">System: Ready. Link wallet to start live sync.</div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
@@ -54,11 +55,19 @@
           window.provider = new ethers.providers.Web3Provider(window.ethereum);
           
           document.getElementById('wallet').innerText = "Linked: " + window.userAddress;
-          document.getElementById('btnConnect').innerText = "WALLET SYNCED ✅";
+          document.getElementById('btnConnect').innerText = "WALLET LIVE ✅";
           document.getElementById('btnConnect').style.background = "#28a745";
           document.getElementById('btnConnect').style.color = "#fff";
 
-          if (typeof fetchBalances === "function") fetchBalances();
+          // SINKRONISASI TOTAL DENGAN APP.JS
+          if (typeof fetchBalances === "function") {
+              fetchBalances(); 
+          }
+          if (typeof setupEventListeners === "function") {
+              setupEventListeners(); 
+          }
+
+          document.getElementById('output').innerText = "System: Real-time monitoring enabled.";
         } catch (err) {
           document.getElementById('output').innerText = "Err: " + err.message;
         }
