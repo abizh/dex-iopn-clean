@@ -1,6 +1,6 @@
 /**
- * MASTER CODE APP.JS - PHASE 1 FINAL AUDIT
- * Precision: High | Real-time: Enabled | Database: Locked
+ * MASTER CODE APP.JS - PHASE 1 FINAL (STABLE)
+ * Status: Live Sync Enabled | Database: Locked
  */
 
 const DEX_CONFIG = {
@@ -16,7 +16,6 @@ const DEX_CONFIG = {
 
 const MIN_ABI = ["function balanceOf(address) view returns (uint256)"];
 
-// --- FUNGSI AMBIL SALDO (ANTI-GAGAL) ---
 async function fetchBalances() {
     const grid = document.getElementById('balance-grid');
     if (!grid || !window.userAddress || !window.provider) return;
@@ -39,13 +38,12 @@ async function fetchBalances() {
         });
 
         const results = await Promise.all(tasks);
-        grid.innerHTML = ""; // Reset grid sebelum render ulang
+        grid.innerHTML = ""; 
         
         results.forEach(res => {
             const numBal = parseFloat(res.balance);
             let displayVal;
             
-            // Logika Format 25M (TETE) & Presisi 4 Desimal (Lainnya)
             if (numBal >= 1000000) {
                 displayVal = (numBal / 1000000).toLocaleString(undefined, {maximumFractionDigits: 2}) + "M";
             } else {
@@ -61,38 +59,28 @@ async function fetchBalances() {
             `;
             grid.appendChild(card);
         });
-    } catch (err) {
-        console.error("Critical Sync Error:", err);
-    }
+    } catch (err) { console.error("Sync Error:", err); }
 }
 
-// --- FUNGSI REAL-TIME LISTENER ---
 function setupEventListeners() {
     if (!window.provider) return;
-
-    // Trigger update tiap blok baru
+    // Monitor blok baru (Native)
     window.provider.on("block", () => fetchBalances());
-
-    // Trigger update jika ada Transfer masuk/keluar ke wallet user
-    const filter = {
-        topics: [ethers.utils.id("Transfer(address,address,uint256)")]
-    };
-    window.provider.on(filter, () => {
-        setTimeout(fetchBalances, 1500);
-    });
+    // Monitor Transfer (Tokens)
+    const filter = { topics: [ethers.utils.id("Transfer(address,address,uint256)")] };
+    window.provider.on(filter, () => setTimeout(fetchBalances, 1500));
 }
 
-// --- UI HANDLERS ---
 function simulateExecution() {
     const val = document.getElementById('amountIn').value;
-    document.getElementById('output').innerText = `Tracing Route for ${val} OPN...\nBest Path: OPN -> WOPN -> tUSDT -> OPNT`;
+    document.getElementById('output').innerText = `Simulating Route for ${val} OPN...\nBest Path: OPN -> WOPN -> tUSDT -> OPNT`;
 }
 
 function executeSwap() {
-    alert("Phase 1 Locked. System ready for Phase 2 Engine integration.");
+    alert("Phase 1 LOCKED. All balances are live.");
 }
 
-// Export ke Window Scope agar bisa diakses index.html
+// Export functions
 window.fetchBalances = fetchBalances;
 window.setupEventListeners = setupEventListeners;
 window.simulateExecution = simulateExecution;
