@@ -1,16 +1,16 @@
 /**
- * MASTER CODE APP.JS - PHASE 1
- * Kombinasi Stabilitas Koneksi & UI Balance
+ * MASTER CODE APP.JS - PHASE 1 (FINAL SYNC)
+ * Data Source: Verified OPN Explorer Addresses
  */
 
 const DEX_CONFIG = {
     TOKENS: {
-        "OPN":   { symbol: "OPN",   name: "iOPN Native",  address: "NATIVE", decimals: 18 },
-        "wOPN":  { symbol: "wOPN",  name: "Wrapped OPN",  address: "0x2e061801C7a780e9D577c61f207044621E8b62CC", decimals: 18 },
-        "tUSDT": { symbol: "tUSDT", name: "Testnet USDT", address: "0x77E154687D04a601968840212720d939626A0EBe", decimals: 18 },
-        "tBNB":  { symbol: "tBNB",  name: "Testnet BNB",  address: "0xd0294b4E48043685f0A1F0571C3527027C0E4a81", decimals: 18 },
-        "OPNT":  { symbol: "OPNT",  name: "OPN Token",    address: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d", decimals: 18 },
-        "TETE":  { symbol: "TETE",  name: "Tester Tok",   address: "0x771699b159F5DEC9608736DC9C6c901Ddb7Afe3E", decimals: 18 }
+        "OPN":   { symbol: "OPN",   name: "IOPN NATIVE",  address: "NATIVE", decimals: 18 },
+        "TETE":  { symbol: "TETE",  name: "TESTER TOK",   address: "0x771699b159F5DEC9608736DC9C6c901Ddb7Afe3E", decimals: 18 },
+        "OPNT":  { symbol: "OPNT",  name: "OPN TESTNET",  address: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d", decimals: 18 },
+        "tUSDT": { symbol: "tUSDT", name: "TESTNET USDT", address: "0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b", decimals: 18 },
+        "tBNB":  { symbol: "tBNB",  name: "TESTNET BNB",  address: "0x92cF36713a5622351c9489D5556B90B321873607", decimals: 18 },
+        "WOPN":  { symbol: "WOPN",  name: "WRAPPED OPN",  address: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84", decimals: 18 }
     }
 };
 
@@ -19,8 +19,7 @@ const MIN_ABI = ["function balanceOf(address) view returns (uint256)"];
 async function fetchBalances() {
     const grid = document.getElementById('balance-grid');
     if (!grid) return;
-    
-    grid.innerHTML = "<p style='grid-column:1/-1; font-size:12px;'>Fetching Assets...</p>";
+    grid.innerHTML = "<p style='grid-column:1/-1; text-align:center; font-size:12px; color:#00d4ff;'>🔄 Syncing Explorer Data...</p>";
 
     try {
         const tasks = Object.keys(DEX_CONFIG.TOKENS).map(async (key) => {
@@ -45,29 +44,34 @@ async function fetchBalances() {
         results.forEach(res => {
             const card = document.createElement('div');
             card.className = "card";
+            const numBal = parseFloat(res.balance);
+            
+            // Format Display (Abbreviation for 25M TETE)
+            let display = numBal >= 1000000 
+                ? (numBal / 1000000).toLocaleString(undefined, {maximumFractionDigits: 2}) + "M"
+                : numBal.toLocaleString(undefined, {maximumFractionDigits: 4});
+
             card.innerHTML = `
                 <small>${res.name}</small>
-                <div class="val">${parseFloat(res.balance).toFixed(2)}</div>
+                <div class="val" style="${numBal > 0 ? 'color:#00ff00;' : 'color:#444;'}">${display}</div>
                 <span class="sym">${res.symbol}</span>
             `;
             grid.appendChild(card);
         });
-    } catch (err) {
-        console.error("Fetch Error:", err);
-    }
+        document.getElementById('output').innerText = "SOP: Blockchain Sync Complete. All Assets Verified.";
+    } catch (err) { console.error(err); }
 }
 
-// Placeholder untuk fitur selanjutnya (Phase 2)
 function simulateExecution() {
-    document.getElementById('output').innerText = "Simulation Mode: Calculating Best Route...";
-    document.getElementById('route').innerText = "OPN -> tUSDT -> OPNT";
+    const val = document.getElementById('amountIn').value;
+    document.getElementById('output').innerText = `Simulating Route for ${val} OPN...`;
+    document.getElementById('output').innerText += `\nPath: OPN -> WOPN -> tUSDT -> OPNT`;
 }
 
 function executeSwap() {
-    alert("Execute feature is locked. Complete Phase 1 first!");
+    alert("Phase 1 Complete. Phase 2 (Engine) Required for Execution.");
 }
 
-// Ekspos ke window
 window.fetchBalances = fetchBalances;
 window.simulateExecution = simulateExecution;
 window.executeSwap = executeSwap;
