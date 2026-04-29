@@ -149,13 +149,18 @@ async function executeSwap() {
     await txA.wait();
 
     // EXECUTE
-    updateSystem("> EXECUTING...");
-    const tx = await executor.executeRoute(
-      pools,
-      path,
-      amtWei,
-      0
-    );
+	updateSystem("> EXECUTING...");
+	const tx = await executor.executeRoute(
+  pools,
+  path,
+  amtWei,
+  minOut,
+  {
+    gasLimit: 500000,
+    maxFeePerGas: ethers.utils.parseUnits("20", "gwei"),
+    maxPriorityFeePerGas: ethers.utils.parseUnits("2", "gwei")
+  }
+);
 
     updateSystem("> TX SENT: " + tx.hash);
 
