@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GOLD AMM V2 FORCE</title>
+<title>GOLD AMM V2</title>
 
 <style>
 body {
@@ -42,7 +42,7 @@ button {
 
 <div class="box">
 
-<h2>🚀 GOLD AMM</h2>
+<h2>🚀 GOLD AMM V2</h2>
 
 <button onclick="connectWallet()">CONNECT</button>
 
@@ -60,14 +60,13 @@ button {
 
 <input id="amountOut" readonly>
 
-<button onclick="executeSwap()">SWAP</button>
+<button id="btnSwap" onclick="executeSwap()">SWAP</button>
 
 <div id="output" class="log"></div>
 
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-
 <script src="app.js"></script>
 
 <script>

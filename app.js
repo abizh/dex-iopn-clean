@@ -1,6 +1,5 @@
 /**
- * GOLD OPTIMIZER — FINAL STABLE ENGINE
- * SYNC ROUTER + POOL + SAFE EXECUTION
+ * GOLD AMM ENGINE — FINAL STABLE
  */
 
 // =============================
@@ -9,8 +8,7 @@
 const ROUTER_ADDR = "0x5111Ec47ea2fd841f562Da9f80DAcA8dB825f7ce";
 
 const ROUTER_ABI = [
-  "function swapExactTokensForTokens(address[] path,uint256 amountIn,uint256 minOut,address to) returns (uint256)",
-  "function getPool(bytes32) view returns (address)"
+  "function swapExactTokensForTokens(address[] path,uint256 amountIn,uint256 minOut,address to) returns (uint256)"
 ];
 
 const POOL_ABI = [
@@ -21,7 +19,8 @@ const DEX_CONFIG = {
   TOKENS: {
     WOPN: { address: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84" },
     OPNT: { address: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d" }
-  }
+  },
+  POOL: "0x34963e16F1092b7d0f2b450fB147e7685259B76e"
 };
 
 // =============================
@@ -32,248 +31,147 @@ window.wallet = {
 };
 
 // =============================
-function updateSystem(msg) {
-  document.getElementById("output").innerHTML = msg;
+function log(msg) {
+  const el = document.getElementById("output");
+  if (el) el.innerHTML = msg;
 }
 
-// =============================
-// INIT
 // =============================
 window.initEngine = function () {
   if (window.userAddress && window.provider) {
-    window.wallet.address = window.userAddress;
-    window.wallet.provider = window.provider;
-    window.wallet.signer = window.provider.getSigner();
+    wallet.address = window.userAddress;
+    wallet.provider = window.provider;
+    wallet.signer = window.provider.getSigner();
   }
 
-  if (!window.wallet.address) {
-    return updateSystem("> ERROR: Wallet not synced");
+  if (!wallet.address) {
+    return log("> ERROR: Wallet not connected");
   }
 
-  fetchBalances();
-  setupEventListeners();
-  simulateExecution();
+  setupEvents();
+  simulate();
 
-  updateSystem("> SYSTEM: READY (SYNCED ROUTER)");
+  log("> SYSTEM READY (AMM LIVE)");
 };
-
-// =============================
-// GET POOL FROM ROUTER (SOURCE OF TRUTH)
-// =============================
-async function getPoolAddress(tokenA, tokenB) {
-  const router = new ethers.Contract(
-    ROUTER_ADDR,
-    ROUTER_ABI,
-    window.wallet.provider
-  );
-
-  const [a, b] =
-    tokenA.toLowerCase() < tokenB.toLowerCase()
-      ? [tokenA, tokenB]
-      : [tokenB, tokenA];
-
-  const key = ethers.utils.keccak256(
-    ethers.utils.solidityPack(["address", "address"], [a, b])
-  );
-
-  return await router.getPool(key);
-}
 
 // =============================
 // SIMULATION (REAL POOL)
 // =============================
-async function simulateExecution() {
+async function simulate() {
   try {
     const amt = document.getElementById("amountIn").value;
     const tIn = document.getElementById("tokenIn").value;
-    const tOut = document.getElementById("tokenOut").value;
 
-    if (!amt || amt <= 0) {
-      document.getElementById("amountOut").value = "0.00";
-      return;
-    }
+    if (!amt || amt <= 0) return;
 
-    const tokenIn = DEX_CONFIG.TOKENS[tIn].address;
-    const tokenOut = DEX_CONFIG.TOKENS[tOut].address;
-
-    const poolAddr = await getPoolAddress(tokenIn, tokenOut);
-
-    if (poolAddr === ethers.constants.AddressZero) {
-      document.getElementById("amountOut").value = "NO POOL";
-      return;
-    }
-
-    const pool = new ethers.Contract(poolAddr, POOL_ABI, window.wallet.provider);
+    const pool = new ethers.Contract(
+      DEX_CONFIG.POOL,
+      POOL_ABI,
+      wallet.provider
+    );
 
     const amountInWei = ethers.utils.parseUnits(amt.toString(), 18);
 
-    const out = await pool.getAmountOut(tokenIn, amountInWei);
-
-    if (out.eq(0)) {
-      document.getElementById("amountOut").value = "NO LIQUIDITY";
-      return;
-    }
+    const out = await pool.getAmountOut(
+      DEX_CONFIG.TOKENS[tIn].address,
+      amountInWei
+    );
 
     document.getElementById("amountOut").value =
       ethers.utils.formatUnits(out, 18);
 
-  } catch (err) {
-    console.log("SIM ERROR:", err);
-    document.getElementById("amountOut").value = "0.00";
+  } catch (e) {
+    log("> SIM ERROR");
   }
 }
 
 // =============================
-// EXECUTION
+// EXECUTE SWAP
 // =============================
 async function executeSwap() {
   const btn = document.getElementById("btnSwap");
 
   try {
-    btn.disabled = true;
-    btn.innerText = "EXECUTING...";
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = "PROCESSING...";
+    }
 
     const amt = document.getElementById("amountIn").value;
     const tIn = document.getElementById("tokenIn").value;
     const tOut = document.getElementById("tokenOut").value;
 
-    const tokenIn = DEX_CONFIG.TOKENS[tIn].address;
-    const tokenOut = DEX_CONFIG.TOKENS[tOut].address;
-
-    const path = [tokenIn, tokenOut];
+    const path = [
+      DEX_CONFIG.TOKENS[tIn].address,
+      DEX_CONFIG.TOKENS[tOut].address
+    ];
 
     const amountInWei = ethers.utils.parseUnits(amt.toString(), 18);
-
-    console.log("ROUTER:", ROUTER_ADDR);
-    console.log("PATH:", path);
-    console.log("USER:", window.wallet.address);
 
     const router = new ethers.Contract(
       ROUTER_ADDR,
       ROUTER_ABI,
-      window.wallet.signer
+      wallet.signer
     );
 
-    // =============================
-    // GET POOL (SYNC)
-    // =============================
-    const poolAddr = await getPoolAddress(tokenIn, tokenOut);
-
-    if (poolAddr === ethers.constants.AddressZero) {
-      throw new Error("POOL NOT FOUND");
-    }
-
-    // =============================
-    // APPROVE (SAFE)
-    // =============================
+    // APPROVE
+    log("> APPROVING TOKEN...");
     const token = new ethers.Contract(
-      tokenIn,
-      [
-        "function approve(address,uint256) returns (bool)",
-        "function allowance(address,address) view returns (uint256)"
-      ],
-      window.wallet.signer
+      path[0],
+      ["function approve(address,uint256) returns (bool)"],
+      wallet.signer
     );
 
-    const allowance = await token.allowance(
-      window.wallet.address,
-      ROUTER_ADDR
+    await (await token.approve(
+      ROUTER_ADDR,
+      ethers.constants.MaxUint256
+    )).wait();
+
+    // GET OUTPUT
+    const pool = new ethers.Contract(
+      DEX_CONFIG.POOL,
+      POOL_ABI,
+      wallet.provider
     );
 
-    if (allowance.lt(amountInWei)) {
-      updateSystem("> APPROVING TOKEN...");
-      console.log("APPROVE TO:", ROUTER_ADDR);
-
-      await (await token.approve(
-        ROUTER_ADDR,
-        ethers.constants.MaxUint256
-      )).wait();
-    } else {
-      console.log("ALREADY APPROVED");
-    }
-
-    // =============================
-    // GET REAL OUTPUT
-    // =============================
-    const pool = new ethers.Contract(poolAddr, POOL_ABI, window.wallet.provider);
-
-    const expectedOut = await pool.getAmountOut(tokenIn, amountInWei);
-
-    if (expectedOut.eq(0)) {
-      throw new Error("NO LIQUIDITY");
-    }
+    const expectedOut = await pool.getAmountOut(
+      path[0],
+      amountInWei
+    );
 
     const minOut = expectedOut.mul(97).div(100);
 
-    // =============================
-    // SAFETY SIMULATION
-    // =============================
-    await router.callStatic.swapExactTokensForTokens(
-      path,
-      amountInWei,
-      minOut,
-      window.wallet.address
-    );
-
-    // =============================
-    // EXECUTE
-    // =============================
-    updateSystem("> EXECUTING SWAP...");
-
+    // SWAP
+    log("> EXECUTING SWAP...");
     const tx = await router.swapExactTokensForTokens(
       path,
       amountInWei,
       minOut,
-      window.wallet.address
+      wallet.address
     );
 
-    updateSystem("> TX: " + tx.hash);
+    log("> TX: " + tx.hash);
     await tx.wait();
 
-    updateSystem("> SUCCESS ✅");
-    fetchBalances();
+    log("> SUCCESS ✅");
 
   } catch (err) {
-    console.log("SWAP ERROR:", err);
-    updateSystem("> ERROR: " + (err.reason || err.message));
+    log("> ERROR: " + (err.reason || err.message));
   } finally {
-    btn.disabled = false;
-    btn.innerText = "INITIATE SWAP";
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = "SWAP";
+    }
   }
 }
 
 // =============================
-async function fetchBalances() {
-  const grid = document.getElementById("balance-grid");
-  grid.innerHTML = "";
-
-  for (const key in DEX_CONFIG.TOKENS) {
-    const token = DEX_CONFIG.TOKENS[key];
-
-    const c = new ethers.Contract(
-      token.address,
-      ["function balanceOf(address) view returns (uint256)"],
-      window.wallet.provider
-    );
-
-    const bal = await c.balanceOf(window.wallet.address);
-
-    grid.innerHTML += `
-      <div class="card">
-        <small>${key}</small>
-        <div class="val">${parseFloat(ethers.utils.formatUnits(bal, 18)).toFixed(4)}</div>
-      </div>
-    `;
-  }
-}
-
-// =============================
-function setupEventListeners() {
+function setupEvents() {
   ["amountIn", "tokenIn", "tokenOut"].forEach(id => {
     const el = document.getElementById(id);
-    el.oninput = simulateExecution;
+    if (el) {
+      el.oninput = simulate;
+      el.onchange = simulate;
+    }
   });
 }
-
-// =============================
-window.executeSwap = executeSwap;
