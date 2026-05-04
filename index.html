@@ -1,61 +1,52 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BOZZDEX V2.1 | Pro Edition</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .dex-card { background: #161b22; padding: 25px; border-radius: 24px; border: 1px solid #30363d; width: 100%; max-width: 420px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .badge { background: #238636; color: #fff; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
-        .input-box { background: #0d1117; border: 1px solid #30363d; border-radius: 16px; padding: 15px; margin-bottom: 12px; }
-        .input-box label { font-size: 13px; color: #8b949e; display: block; margin-bottom: 8px; }
-        .input-box input { background: transparent; border: none; color: #fff; font-size: 24px; width: 100%; outline: none; }
-        .input-box small { color: #58a6ff; font-weight: bold; }
-        button { width: 100%; padding: 16px; border-radius: 16px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.2s; }
-        #btnConnect { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; margin-bottom: 15px; }
-        #btnConnect:hover { background: #30363d; }
-        #btnSwap { background: linear-gradient(90deg, #238636, #2ea043); color: white; margin-top: 10px; }
-        #btnSwap:disabled { background: #21262d; color: #484f58; cursor: not-allowed; opacity: 0.6; }
-        .footer-info { margin-top: 20px; font-size: 11px; color: #8b949e; border-top: 1px solid #30363d; padding-top: 15px; }
-        .log-box { font-family: 'Courier New', monospace; background: #010409; padding: 10px; border-radius: 8px; margin-top: 10px; color: #7ee787; height: 50px; overflow-y: auto; font-size: 10px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOZZDEX V2.1</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+
+<style>
+body {
+    background: #0f0f0f;
+    color: white;
+}
+</style>
 </head>
-<body>
 
-<div class="dex-card">
-    <div class="header">
-        <span style="font-weight: 800; font-size: 18px; color: #fff;">BOZZDEX <span style="color: #58a6ff;">V2.1</span></span>
-        <span id="networkBadge" class="badge">Offline</span>
-    </div>
+<body class="flex flex-col items-center mt-10">
 
-    <button id="btnConnect">Hubungkan Dompet</button>
+<h1 class="text-2xl mb-4">🔥 BOZZDEX</h1>
 
-    <div class="input-box">
-        <label>Jual (Token A)</label>
-        <input type="number" id="inputAmount" placeholder="0.0" autocomplete="off">
-        <small id="balIn">Saldo: 0.00</small>
-    </div>
+<button id="btnConnect" class="bg-red-700 px-4 py-2 rounded">
+CONNECT WALLET
+</button>
 
-    <div style="text-align: center; color: #30363d; margin: -5px 0 5px;">⇅</div>
+<p id="networkBadge" class="mt-2 text-sm text-gray-400">Offline</p>
 
-    <div class="input-box">
-        <label>Beli (Token B)</label>
-        <input type="number" id="outputAmount" placeholder="0.0" readonly>
-        <small id="balOut">Saldo: 0.00</small>
-    </div>
+<div class="mt-6 bg-gray-900 p-4 rounded w-80">
 
-    <button id="btnSwap" disabled>MULAI PERDAGANGAN</button>
+<input id="inputAmount" type="number" placeholder="Amount In"
+class="w-full p-2 mb-3 bg-black border border-gray-700">
 
-    <div class="footer-info">
-        <div><strong>Router:</strong> 0x98cb...1961</div>
-        <div><strong>Pool:</strong> 0x650d...693a8</div>
-        <div class="log-box" id="statusLog">System initialized. Awaiting user...</div>
-    </div>
+<input id="outputAmount" type="number" placeholder="Estimated Out"
+class="w-full p-2 mb-3 bg-black border border-gray-700" readonly>
+
+<p id="balIn" class="text-xs text-gray-400">Saldo: -</p>
+<p id="balOut" class="text-xs text-gray-400 mb-3">Saldo: -</p>
+
+<button id="btnSwap" disabled
+class="bg-yellow-500 w-full py-2 rounded text-black font-bold">
+SWAP
+</button>
+
 </div>
 
+<p id="statusLog" class="mt-4 text-sm text-gray-400">Ready...</p>
+
 <script src="app.js"></script>
+
 </body>
 </html>
