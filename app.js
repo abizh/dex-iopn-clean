@@ -1,45 +1,59 @@
-const DEX_ADDRESS = "0xf24fcf8992A336662eB43232E702dE5b6449b6F3"; 
-const ABI = [
-    "function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)",
-    "function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)"
+// ==========================================
+// BOZZDEX V2.1 - SINKRONISASI TOTAL
+// ==========================================
+
+const DEX_ADDRESS = "0xf24fcf8992A336662eB43232E702dE5b6449b6F3";
+const WOPN_ADDRESS = "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84";
+
+const DEX_ABI = [
+    "function swap(address tIn, address tOut, uint256 amtIn, uint256 minOut) external",
+    "function getPool(address tA, address tB) view returns (address)"
 ];
 
-const provider = new ethers.BrowserProvider(window.ethereum);
+let provider, signer, account;
 
-// FUNGSI UTAMA: MENGHIDUPKAN ANGKA OUTPUT
-async function updateEstimate() {
-    const inputAmount = document.getElementById('inputAmount').value;
-    const outputField = document.getElementById('outputAmount');
+async function connectWallet() {
+    console.log("Mencoba menghubungkan wallet...");
     
-    if (!inputAmount || inputAmount <= 0) {
-        outputField.value = "0.0";
-        return;
-    }
+    if (typeof window.ethereum !== 'undefined') {
+        try {
+            // Gunakan BrowserProvider untuk ethers v6
+            provider = new ethers.BrowserProvider(window.ethereum);
+            
+            // Request akun
+            const accounts = await provider.send("eth_requestAccounts", []);
+            signer = await provider.getSigner();
+            account = accounts[0];
 
-    try {
-        const contract = new ethers.Contract(DEX_ADDRESS, ABI, provider);
-        const amountIn = ethers.parseEther(inputAmount);
-        const path = ["0xTOKEN_A", "0xTOKEN_B"]; // GANTI DENGAN ADDR TOKEN ASLI
+            console.log("Terkoneksi ke:", account);
 
-        const amounts = await contract.getAmountsOut(amountIn, path);
-        outputField.value = ethers.formatEther(amounts[1]);
-        console.log("Harga Berhasil Diupdate!");
-    } catch (error) {
-        console.error("Gagal ambil harga:", error);
-        outputField.value = "Error Harga";
+            // Update UI - Gunakan ID yang sesuai di HTML: 'connectBtn'
+            const btn = document.getElementById('connectBtn');
+            if (btn) {
+                btn.innerText = account.substring(0, 6) + "..." + account.substring(38);
+                btn.classList.remove('btn-connect');
+                btn.classList.add('wallet-active');
+            }
+
+            const swapBtn = document.getElementById('swapBtn');
+            if (swapBtn) {
+                swapBtn.innerText = "MULAI PERDAGANGAN";
+            }
+
+            alert("Wallet Berhasil Terhubung!");
+        } catch (error) {
+            console.error("User menolak atau error:", error);
+            alert("Koneksi dibatalkan.");
+        }
+    } else {
+        alert("Wallet tidak terdeteksi! Gunakan Mises Browser atau Kiwi Browser.");
     }
 }
 
-// PASANG LISTENER (Biar UI Bergerak saat Diketik)
-document.getElementById('inputAmount').addEventListener('input', updateEstimate);
-
-async function executeSwap() {
-    try {
-        const signer = await provider.getSigner();
-        const contract = new ethers.Contract(DEX_ADDRESS, ABI, signer);
-        // ... Logika swap kamu ...
-        alert("Transaksi Berhasil dikirim ke Blockchain!");
-    } catch (error) {
-        alert("Detail Error: " + error.message);
+// Pasang event listener setelah DOM selesai dimuat
+document.addEventListener('DOMContentLoaded', () => {
+    const cBtn = document.getElementById('connectBtn');
+    if (cBtn) {
+        cBtn.onclick = connectWallet; // Gunakan .onclick untuk kepastian di mobile
     }
-}
+});
