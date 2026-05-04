@@ -1,72 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BOZZDEX V2.1 | Royal Gold</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>BOZZDEX V2.1 | Pro Edition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
-        body {
-            background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
-            color: white;
-            font-family: 'Inter', sans-serif;
-        }
-        .gold-glow {
-            box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
-            border: 1px solid #d4af37;
-        }
-        .btn-gold {
-            background: linear-gradient(135deg, #d4af37 0%, #f9e076 100%);
-            color: black;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-        .btn-gold:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(212, 175, 55, 0.4); }
-        .btn-connect { background-color: #8b0000; border: 1px solid #d4af37; }
-        .wallet-active { background-color: #4b3d00; border: 1px solid #f9e076; }
-        input { background: rgba(255, 255, 255, 0.05); border: 1px solid #333; outline: none; color: #f9e076; }
-        input:focus { border-color: #d4af37; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0e1117; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .dex-card { background: #161b22; padding: 2rem; border-radius: 20px; border: 1px solid #30363d; width: 100%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .status-badge { font-size: 0.8rem; padding: 4px 10px; border-radius: 12px; background: #238636; color: white; margin-bottom: 1rem; display: inline-block; }
+        .input-group { background: #0d1117; padding: 15px; border-radius: 12px; margin-bottom: 1rem; border: 1px solid #30363d; }
+        label { color: #8b949e; font-size: 0.9rem; }
+        input { background: transparent; border: none; color: #fff; font-size: 1.5rem; width: 100%; outline: none; margin-top: 5px; }
+        button { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        #btnConnect { background: #21262d; color: #c9d1d9; }
+        #btnSwap { background: #238636; color: white; font-size: 1.1rem; }
+        #btnSwap:disabled { background: #161b22; color: #484f58; cursor: not-allowed; }
+        .pool-data { margin-top: 1.5rem; font-size: 0.75rem; color: #8b949e; border-top: 1px solid #30363d; pt: 1rem; }
+        .log-area { font-family: monospace; font-size: 0.7rem; color: #58a6ff; margin-top: 10px; height: 40px; overflow-y: auto; }
     </style>
 </head>
-<body class="min-h-screen">
-    <nav class="flex justify-between items-center p-6 border-b border-gray-800">
-        <div class="text-2xl font-bold italic">
-            <span class="text-white">BOZZ</span><span class="text-[#d4af37]">DEX</span>
-        </div>
-        <button id="connectBtn" class="btn-connect px-6 py-2 rounded-full text-white text-sm font-bold gold-glow">
-            CONNECT WALLET
-        </button>
-    </nav>
+<body>
 
-    <main class="flex flex-col items-center justify-center mt-10 px-4">
-        <div class="gold-glow w-full max-w-md p-6 rounded-3xl bg-black/80 backdrop-blur-md">
-            <h2 class="text-lg font-semibold mb-4 text-[#d4af37]">Swap Tokens</h2>
+<div class="dex-card">
+    <div id="networkStatus" class="status-badge">Menunggu Koneksi...</div>
+    <button id="btnConnect" onclick="connectWallet()">Hubungkan Dompet</button>
 
-            <div class="bg-gray-900/50 p-4 rounded-2xl mb-2 border border-gray-800">
-                <div class="flex justify-between items-center">
-                    <input type="number" id="amtIn" placeholder="0.0" class="w-2/3 bg-transparent text-2xl font-medium">
-                    <span class="text-sm font-bold text-gray-300">TOKEN A</span>
-                </div>
-            </div>
+    <div class="input-group">
+        <label>Anda Jual (Token A)</label>
+        <input type="number" id="inputAmount" placeholder="0.0" oninput="calculateEstimate()">
+        <small id="balanceIn">Saldo: 0.0</small>
+    </div>
 
-            <div class="flex justify-center -my-4 relative z-10">
-                <div class="bg-black p-2 rounded-xl border border-[#d4af37] text-[#d4af37]">↓</div>
-            </div>
+    <div style="text-align: center; margin: -10px 0 10px;">↓</div>
 
-            <div class="bg-gray-900/50 p-4 rounded-2xl mt-2 border border-gray-800">
-                <div class="flex justify-between items-center">
-                    <input type="number" id="amtOut" placeholder="0.0" class="w-2/3 bg-transparent text-2xl font-medium" readonly>
-                    <span class="text-sm font-bold text-[#d4af37]">wOPN</span>
-                </div>
-            </div>
+    <div class="input-group">
+        <label>Anda Beli (Token B)</label>
+        <input type="number" id="outputAmount" placeholder="0.0" disabled>
+        <small id="balanceOut">Saldo: 0.0</small>
+    </div>
 
-            <button id="swapBtn" class="btn-gold w-full py-4 rounded-2xl mt-6 uppercase tracking-widest">
-                ENTER AMOUNT
-            </button>
-        </div>
-    </main>
+    <button id="btnSwap" onclick="executeSwap()" disabled>MULAI PERDAGANGAN</button>
 
-    <script src="app.js"></script>
+    <div class="pool-data">
+        <div>Router: <span id="routerAddr">0x98cb...1961</span></div>
+        <div>Pool: <span id="poolAddr">0x650d...693a8</span></div>
+        <div class="log-area" id="logConsole">System Ready...</div>
+    </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>

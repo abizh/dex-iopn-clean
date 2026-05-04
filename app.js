@@ -1,55 +1,121 @@
-// BOZZDEX V2.1 - PRODUCTION LOGIC
-const DEX_ADDRESS = "0xf24fcf8992A336662eB43232E702dE5b6449b6F3";
+// CONFIGURATION - SINKRON DENGAN REMIX & POOL
+const CONTRACTS = {
+    ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
+    T_IN: "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84", // Token A
+    T_OUT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d" // Token B/wOPN
+};
 
-const DEX_ABI = [
-  "function swap(address tIn, address tOut, uint256 amtIn, uint256 minOut) external",
-  "function addLiquidity(address tA, address tB, uint256 amtA, uint256 amtB) external",
-  "function getPool(address tA, address tB) view returns (address)",
-  "function wOPN() view returns (address)",
-  "function removeLiquidityMulti(address tA, address tB, uint8 percentChoice, bool toNative) external"
-];
+const ABIS = {
+    ROUTER: [
+        "function swap(address tIn, address tOut, uint256 amtIn, uint256 minOut) external",
+        "function getPool(address, address) view returns (address)",
+        "function fee() view returns (uint256)"
+    ],
+    ERC20: [
+        "function approve(address spender, uint256 amount) external returns (bool)",
+        "function allowance(address owner, address spender) view returns (uint256)",
+        "function balanceOf(address account) view returns (uint256)",
+        "function decimals() view returns (uint8)"
+    ]
+};
 
-let provider, signer, account;
+let signer = null;
+let provider = null;
 
-async function connectWallet() {
-    if (window.ethereum) {
-        try {
-            provider = new ethers.BrowserProvider(window.ethereum);
-            const accounts = await provider.send("eth_requestAccounts", []);
-            signer = await provider.getSigner();
-            account = accounts[0];
-            
-            const btn = document.getElementById('connectBtn');
-            btn.innerText = account.substring(0,6) + "..." + account.substring(38);
-            btn.classList.add('wallet-active');
-            document.getElementById('swapBtn').innerText = "MULAI PERDAGANGAN";
-            console.log("BOZZDEX Live:", account);
-        } catch (e) { alert("Koneksi Gagal!"); }
-    } else { alert("Gunakan Mises Browser!"); }
+// LOGGING SYSTEM
+function logger(msg) {
+    const consoleElem = document.getElementById('logConsole');
+    consoleElem.innerText = msg;
+    console.log(`[BOZZDEX]: ${msg}`);
 }
 
+// CONNECT WALLET
+async function connectWallet() {
+    if (!window.ethereum) return alert("Pasang Metamask/OKX Wallet!");
+    
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+    
+    const addr = await signer.getAddress();
+    document.getElementById('btnConnect').innerText = addr.substring(0,6) + "..." + addr.substring(38);
+    document.getElementById('networkStatus').innerText = "Terhubung: OPN Testnet";
+    document.getElementById('btnSwap').disabled = false;
+    
+    updateBalances(addr);
+    logger("Wallet Terhubung: " + addr);
+}
+
+// UPDATE REAL-TIME BALANCE
+async function updateBalances(userAddr) {
+    const tokenIn = new ethers.Contract(CONTRACTS.T_IN, ABIS.ERC20, provider);
+    const tokenOut = new ethers.Contract(CONTRACTS.T_OUT, ABIS.ERC20, provider);
+    
+    const [balIn, balOut] = await Promise.all([
+        tokenIn.balanceOf(userAddr),
+        tokenOut.balanceOf(userAddr)
+    ]);
+    
+    document.getElementById('balanceIn').innerText = "Saldo: " + ethers.formatEther(balIn);
+    document.getElementById('balanceOut').innerText = "Saldo: " + ethers.formatEther(balOut);
+}
+
+// CORE SWAP LOGIC - AUDITED
 async function executeSwap() {
-    if (!signer) return connectWallet();
-    const val = document.getElementById('amtIn').value;
-    if (!val || val <= 0) return alert("Isi jumlah!");
+    const amountInput = document.getElementById('inputAmount').value;
+    if (!amountInput || amountInput <= 0) return logger("Input tidak valid!");
 
     try {
-        const contract = new ethers.Contract(DEX_ADDRESS, DEX_ABI, signer);
-        const amtWei = ethers.parseEther(val);
+        const userAddr = await signer.getAddress();
+        const amountWei = ethers.parseEther(amountInput);
         
-        // Ambil wOPN otomatis dari contract
-        const tOut = await contract.wOPN();
-        const tIn = "0xTOKEN_ADDRESS_DI_SINI"; // Masukkan alamat token yang mau di-swap
+        const tokenInContract = new ethers.Contract(CONTRACTS.T_IN, ABIS.ERC20, signer);
+        const dexContract = new ethers.Contract(CONTRACTS.ROUTER, ABIS.ROUTER, signer);
 
-        console.log("Proses Swap ke Router...");
-        const tx = await contract.swap(tIn, tOut, amtWei, 0);
-        await tx.wait();
-        alert("Swap Berhasil! 🔥");
+        // STEP 1: AUDIT SALDO
+        logger("Memverifikasi Saldo...");
+        const balance = await tokenInContract.balanceOf(userAddr);
+        if (balance < amountWei) throw new Error("Saldo Token A tidak cukup!");
+
+        // STEP 2: AUDIT APPROVAL (Celah terbesar jika terlewati)
+        logger("Memeriksa Izin Kontrak (Allowance)...");
+        const currentAllowance = await tokenInContract.allowance(userAddr, CONTRACTS.ROUTER);
+        
+        if (currentAllowance < amountWei) {
+            logger("Meminta Persetujuan (Approve)...");
+            const txApprove = await tokenInContract.approve(CONTRACTS.ROUTER, ethers.MaxUint256);
+            await txApprove.wait();
+            logger("Approval Berhasil!");
+        }
+
+        // STEP 3: EKSEKUSI SWAP
+        logger("Menghitung Gas & Eksekusi Swap...");
+        // Menggunakan minOut 0 untuk fleksibilitas testing likuiditas rendah
+        const txSwap = await dexContract.swap(
+            CONTRACTS.T_IN,
+            CONTRACTS.T_OUT,
+            amountWei,
+            0 
+        );
+
+        logger("Transaksi dikirim ke Blockchain...");
+        const receipt = await txSwap.wait();
+        
+        if (receipt.status === 1) {
+            logger("SWAP SUKSES!");
+            alert("Swap Berhasil!\nHash: " + receipt.hash);
+            updateBalances(userAddr);
+        } else {
+            throw new Error("Transaksi Gagal di Blockchain (Reverted)");
+        }
+
     } catch (err) {
+        logger("Gagal: " + (err.reason || err.message));
         console.error(err);
-        alert("Gagal: " + (err.reason || "Cek Saldo/Approval"));
     }
 }
 
-document.getElementById('connectBtn').onclick = connectWallet;
-document.getElementById('swapBtn').onclick = executeSwap;
+// ESTIMASI (OPSIONAL - BISA DIKEMBANGKAN)
+function calculateEstimate() {
+    const val = document.getElementById('inputAmount').value;
+    document.getElementById('outputAmount').value = val; // Estimasi 1:1 untuk testing
+}
