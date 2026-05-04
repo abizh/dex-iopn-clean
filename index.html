@@ -6,46 +6,53 @@
     <title>BOZZDEX V2.1 | Pro Edition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0e1117; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .dex-card { background: #161b22; padding: 2rem; border-radius: 20px; border: 1px solid #30363d; width: 100%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .status-badge { font-size: 0.8rem; padding: 4px 10px; border-radius: 12px; background: #238636; color: white; margin-bottom: 1rem; display: inline-block; }
-        .input-group { background: #0d1117; padding: 15px; border-radius: 12px; margin-bottom: 1rem; border: 1px solid #30363d; }
-        label { color: #8b949e; font-size: 0.9rem; }
-        input { background: transparent; border: none; color: #fff; font-size: 1.5rem; width: 100%; outline: none; margin-top: 5px; }
-        button { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        #btnConnect { background: #21262d; color: #c9d1d9; }
-        #btnSwap { background: #238636; color: white; font-size: 1.1rem; }
-        #btnSwap:disabled { background: #161b22; color: #484f58; cursor: not-allowed; }
-        .pool-data { margin-top: 1.5rem; font-size: 0.75rem; color: #8b949e; border-top: 1px solid #30363d; pt: 1rem; }
-        .log-area { font-family: monospace; font-size: 0.7rem; color: #58a6ff; margin-top: 10px; height: 40px; overflow-y: auto; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .dex-card { background: #161b22; padding: 25px; border-radius: 24px; border: 1px solid #30363d; width: 100%; max-width: 420px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .badge { background: #238636; color: #fff; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .input-box { background: #0d1117; border: 1px solid #30363d; border-radius: 16px; padding: 15px; margin-bottom: 12px; }
+        .input-box label { font-size: 13px; color: #8b949e; display: block; margin-bottom: 8px; }
+        .input-box input { background: transparent; border: none; color: #fff; font-size: 24px; width: 100%; outline: none; }
+        .input-box small { color: #58a6ff; font-weight: bold; }
+        button { width: 100%; padding: 16px; border-radius: 16px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        #btnConnect { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; margin-bottom: 15px; }
+        #btnConnect:hover { background: #30363d; }
+        #btnSwap { background: linear-gradient(90deg, #238636, #2ea043); color: white; margin-top: 10px; }
+        #btnSwap:disabled { background: #21262d; color: #484f58; cursor: not-allowed; opacity: 0.6; }
+        .footer-info { margin-top: 20px; font-size: 11px; color: #8b949e; border-top: 1px solid #30363d; padding-top: 15px; }
+        .log-box { font-family: 'Courier New', monospace; background: #010409; padding: 10px; border-radius: 8px; margin-top: 10px; color: #7ee787; height: 50px; overflow-y: auto; font-size: 10px; }
     </style>
 </head>
 <body>
 
 <div class="dex-card">
-    <div id="networkStatus" class="status-badge">Menunggu Koneksi...</div>
-    <button id="btnConnect" onclick="connectWallet()">Hubungkan Dompet</button>
-
-    <div class="input-group">
-        <label>Anda Jual (Token A)</label>
-        <input type="number" id="inputAmount" placeholder="0.0" oninput="calculateEstimate()">
-        <small id="balanceIn">Saldo: 0.0</small>
+    <div class="header">
+        <span style="font-weight: 800; font-size: 18px; color: #fff;">BOZZDEX <span style="color: #58a6ff;">V2.1</span></span>
+        <span id="networkBadge" class="badge">Offline</span>
     </div>
 
-    <div style="text-align: center; margin: -10px 0 10px;">↓</div>
+    <button id="btnConnect">Hubungkan Dompet</button>
 
-    <div class="input-group">
-        <label>Anda Beli (Token B)</label>
-        <input type="number" id="outputAmount" placeholder="0.0" disabled>
-        <small id="balanceOut">Saldo: 0.0</small>
+    <div class="input-box">
+        <label>Jual (Token A)</label>
+        <input type="number" id="inputAmount" placeholder="0.0" autocomplete="off">
+        <small id="balIn">Saldo: 0.00</small>
     </div>
 
-    <button id="btnSwap" onclick="executeSwap()" disabled>MULAI PERDAGANGAN</button>
+    <div style="text-align: center; color: #30363d; margin: -5px 0 5px;">⇅</div>
 
-    <div class="pool-data">
-        <div>Router: <span id="routerAddr">0x98cb...1961</span></div>
-        <div>Pool: <span id="poolAddr">0x650d...693a8</span></div>
-        <div class="log-area" id="logConsole">System Ready...</div>
+    <div class="input-box">
+        <label>Beli (Token B)</label>
+        <input type="number" id="outputAmount" placeholder="0.0" readonly>
+        <small id="balOut">Saldo: 0.00</small>
+    </div>
+
+    <button id="btnSwap" disabled>MULAI PERDAGANGAN</button>
+
+    <div class="footer-info">
+        <div><strong>Router:</strong> 0x98cb...1961</div>
+        <div><strong>Pool:</strong> 0x650d...693a8</div>
+        <div class="log-box" id="statusLog">System initialized. Awaiting user...</div>
     </div>
 </div>
 
