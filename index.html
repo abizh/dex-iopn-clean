@@ -1,101 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BOZZDEX V2.1</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
-    <style>
-        body {
-            background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
-            color: white;
-            font-family: 'Inter', sans-serif;
-        }
-        .gold-glow {
-            box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
-            border: 1px solid #d4af37;
-        }
-        .btn-gold {
-            background: linear-gradient(135deg, #d4af37 0%, #f9e076 100%);
-            color: white;
-            text-shadow: 1px 1px 2px black;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-        .btn-gold:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(212, 175, 55, 0.4);
-        }
-        .btn-connect {
-            background-color: #8b0000; /* Merah Tua */
-            border: 1px solid #d4af37;
-        }
-        .wallet-active {
-            background-color: #4b3d00; /* Emas Tua */
-            border: 1px solid #f9e076;
-        }
-        input {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid #333;
-            outline: none;
-        }
-        input:focus { border-color: #d4af37; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOZZDEX V2.1</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+
+<style>
+body {
+    background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
+    color: white;
+}
+.gold-glow {
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+    border: 1px solid #d4af37;
+}
+.btn-gold {
+    background: linear-gradient(135deg, #d4af37 0%, #f9e076 100%);
+}
+.btn-connect {
+    background-color: #8b0000;
+}
+.wallet-active {
+    background-color: #4b3d00;
+}
+input {
+    background: rgba(255,255,255,0.05);
+}
+</style>
 </head>
-<body class="min-h-screen">
-    <nav class="flex justify-between items-center p-6 border-b border-gray-800">
-        <div class="text-2xl font-bold tracking-tighter italic">
-            <span class="text-white">BOZZ</span><span class="text-[#d4af37]">DEX</span>
-        </div>
-        <button id="connectBtn" class="btn-connect px-6 py-2 rounded-full text-white text-sm font-bold gold-glow">
-            CONNECT WALLET
-        </button>
-    </nav>
 
-    <main class="flex flex-col items-center justify-center mt-20 px-4">
-        <div class="gold-glow w-full max-w-md p-6 rounded-3xl bg-black/50 backdrop-blur-md">
-            <div class="flex justify-between mb-4">
-                <h2 class="text-lg font-semibold">Swap</h2>
-                <button class="text-gray-400 hover:text-[#d4af37]">⚙️</button>
-            </div>
+<body>
 
-            <div class="bg-gray-900/50 p-4 rounded-2xl mb-2 border border-gray-800">
-                <div class="flex justify-between mb-2">
-                    <input type="number" id="amtIn" placeholder="0.0" class="w-2/3 bg-transparent text-2xl font-medium">
-                    <button class="btn-gold px-3 py-1 rounded-xl text-xs">SELECT TOKEN</button>
-                </div>
-            </div>
+<nav class="flex justify-between p-6">
+    <h1 class="text-xl font-bold">BOZZDEX</h1>
+    <button id="connectBtn" class="btn-connect px-4 py-2 rounded">
+        CONNECT
+    </button>
+</nav>
 
-            <div class="flex justify-center -my-4 relative z-10">
-                <button class="bg-gray-800 p-2 rounded-xl border border-[#d4af37] text-[#d4af37]">↓</button>
-            </div>
+<div class="max-w-md mx-auto mt-10 p-6 gold-glow rounded">
 
-            <div class="bg-gray-900/50 p-4 rounded-2xl mt-2 border border-gray-800">
-                <div class="flex justify-between mb-2">
-                    <input type="number" id="amtOut" placeholder="0.0" class="w-2/3 bg-transparent text-2xl font-medium" readonly>
-                    <button class="btn-gold px-3 py-1 rounded-xl text-xs italic">wOPN</button>
-                </div>
-            </div>
+    <input id="amtIn" type="number" placeholder="Amount In" class="w-full p-3 mb-4">
 
-            <div class="mt-4 flex items-center justify-between text-sm p-2">
-                <span class="text-gray-400">Receive Native OPN</span>
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="toNativeToggle" class="sr-only peer">
-                    <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#d4af37]"></div>
-                </label>
-            </div>
+    <input id="amtOut" type="number" placeholder="Estimated Out" class="w-full p-3 mb-4" readonly>
 
-            <button id="swapBtn" class="btn-gold w-full py-4 rounded-2xl mt-6 uppercase tracking-widest">
-                ENTER AMOUNT
-            </button>
-        </div>
+    <button id="swapBtn" class="btn-gold w-full py-3 rounded">
+        ENTER AMOUNT
+    </button>
 
-        <div class="mt-8 text-gray-500 text-sm">
-            <p>Slippage Protection: <span class="text-[#d4af37]">0.3%</span></p>
-        </div>
-    </main>
+    <p id="status" class="mt-4 text-sm text-gray-400"></p>
 
-    <script src="app.js"></script>
+</div>
+
+<script src="app.js"></script>
+
 </body>
 </html>
