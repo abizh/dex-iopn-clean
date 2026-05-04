@@ -1,168 +1,93 @@
-/*/**
- * BOZZ DEX ENGINE — V2 STABLE
- */
+// ==========================================
+// BOZZDEX V2.1 - MASTER LOGIC
+// Router: 0xf24fcf8992A336662eB43232E702dE5b6449b6F3
+// ==========================================
 
-// =============================
-// CONFIG (LATEST DATA)
-// =============================
-const ROUTER_ADDR = "0x65Beb7F2eAbCDd8CfD4d53A51c5E704E9404eC91";
+const DEX_ADDRESS = "0xf24fcf8992A336662eB43232E702dE5b6449b6F3";
+const WOPN_ADDRESS = "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84";
 
-// ABI disesuaikan dengan kontrak BOZZ_DEX.sol terbaru
-const ROUTER_ABI = [
-  "function swap(address tIn, address tOut, uint256 amtIn, uint256 minOut) external",
-  "function getAmountOut(uint256 amtIn, uint256 resIn, uint256 resOut) public view returns (uint256)",
-  "function getPool(address t0, address t1) public view returns (address)"
+// ABI Lengkap sesuai Master Code Solidity V2.1
+const DEX_ABI = [
+    "function swap(address tIn, address tOut, uint256 amtIn, uint256 minOut) external",
+    "function addLiquidity(address tA, address tB, uint256 amtA, uint256 amtB) external",
+    "function removeLiquidityMulti(address tA, address tB, uint8 percentChoice, bool toNative) external",
+    "function getPool(address tA, address tB) view returns (address)",
+    "function fee() view returns (uint256)",
+    "function treasury() view returns (address)"
 ];
 
-// ABI untuk membaca reserve dari Pool
-const POOL_ABI = [
-  "function reserve0() view returns (uint112)",
-  "function reserve1() view returns (uint112)",
-  "function token0() view returns (address)",
-  "function token1() view returns (address)"
+const ERC20_ABI = [
+    "function approve(address spender, uint256 amount) external returns (bool)",
+    "function allowance(address owner, address spender) view returns (uint256)",
+    "function balanceOf(address account) view returns (uint256)"
 ];
 
-const DEX_CONFIG = {
-  TOKENS: {
-    WOPN: { address: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84" },
-    OPNT: { address: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d" }
-  },
-  POOL: "0x246D33734CE3032C824CAF8ac062ac5f0C8b20Db"
-};
+let provider, signer, account;
 
-// =============================
-window.wallet = {
-  address: null,
-  provider: null,
-  signer: null
-};
-
-function log(msg) {
-  const el = document.getElementById("output");
-  if (el) el.innerHTML = msg;
+// --- FUNGSI KONEKSI WALLET ---
+async function connectWallet() {
+    if (window.ethereum) {
+        try {
+            provider = new ethers.BrowserProvider(window.ethereum);
+            await provider.send("eth_requestAccounts", []);
+            signer = await provider.getSigner();
+            account = await signer.getAddress();
+            
+            const btn = document.getElementById('connectBtn');
+            btn.innerText = account.substring(0,6) + "..." + account.substring(38);
+            btn.classList.replace('btn-connect', 'wallet-active');
+            
+            document.getElementById('swapBtn').innerText = "MULAI PERDAGANGAN";
+            console.log("BOZZDEX Connected:", account);
+        } catch (error) {
+            console.error("Koneksi Gagal:", error);
+        }
+    } else {
+        alert("Silakan install MetaMask atau gunakan Web3 Browser!");
+    }
 }
 
-window.initEngine = function () {
-  if (window.userAddress && window.provider) {
-    wallet.address = window.userAddress;
-    wallet.provider = window.provider;
-    wallet.signer = window.provider.getSigner();
-  }
-
-  if (!wallet.address) return log("> ERROR: Wallet not connected");
-
-  setupEvents();
-  simulate();
-  log("> BOZZ DEX LIVE");
-};
-
-// =============================
-// SIMULATION (LOGIKA AMM BARU)
-// =============================
-async function simulate() {
-  try {
-    const amt = document.getElementById("amountIn").value;
-    const tInKey = document.getElementById("tokenIn").value;
-    const tOutKey = document.getElementById("tokenOut").value;
-
-    if (!amt || amt <= 0) return;
-
-    const router = new ethers.Contract(ROUTER_ADDR, ROUTER_ABI, wallet.provider);
-    const pool = new ethers.Contract(DEX_CONFIG.POOL, POOL_ABI, wallet.provider);
-
-    const addrIn = DEX_CONFIG.TOKENS[tInKey].address;
-    const token0 = await pool.token0();
-    
-    // Ambil data Reserve
-    const r0 = await pool.reserve0();
-    const r1 = await pool.reserve1();
-
-    // Tentukan mana ResIn dan ResOut
-    const [resIn, resOut] = (addrIn.toLowerCase() === token0.toLowerCase()) 
-      ? [r0, r1] 
-      : [r1, r0];
-
-    const amountInWei = ethers.utils.parseUnits(amt.toString(), 18);
-    const out = await router.getAmountOut(amountInWei, resIn, resOut);
-
-    document.getElementById("amountOut").value = ethers.utils.formatUnits(out, 18);
-
-  } catch (e) {
-    console.error(e);
-    log("> SIM ERROR: Check Liquidity");
-  }
-}
-
-// =============================
-// EXECUTE SWAP
-// =============================
+// --- FUNGSI EKSEKUSI SWAP ---
 async function executeSwap() {
-  const btn = document.getElementById("btnSwap");
+    if (!signer) return connectWallet();
+    
+    const amtInValue = document.getElementById('amtIn').value;
+    if (!amtInValue || amtInValue <= 0) return alert("Masukkan jumlah token!");
 
-  try {
-    if (btn) {
-      btn.disabled = true;
-      btn.innerText = "PROCESSING...";
+    try {
+        const dexContract = new ethers.Contract(DEX_ADDRESS, DEX_ABI, signer);
+        const amountWei = ethers.parseEther(amtInValue);
+        
+        // Contoh Swap: User menukar Token A ke wOPN
+        // Dalam implementasi nyata, address tIn diambil dari dropdown 'Select Token'
+        const tokenIn = "0x...ALAMAT_TOKEN_USER..."; 
+        const tokenOut = WOPN_ADDRESS;
+
+        // 1. Cek & Approve Token Terlebih Dahulu
+        const tokenContract = new ethers.Contract(tokenIn, ERC20_ABI, signer);
+        console.log("Meminta Izin (Approval)...");
+        const appTx = await tokenContract.approve(DEX_ADDRESS, amountWei);
+        await appTx.wait();
+
+        // 2. Eksekusi Swap
+        console.log("Mengeksekusi Swap di Router...");
+        const swapTx = await dexContract.swap(tokenIn, tokenOut, amountWei, 0); // minOut=0 untuk tes
+        await swapTx.wait();
+
+        alert("Swap Berhasil! Saldo akan segera diperbarui.");
+    } catch (error) {
+        console.error("Detail Error:", error);
+        alert("Transaksi Gagal. Cek Konsol Termux/Browser.");
     }
-
-    const amt = document.getElementById("amountIn").value;
-    const tInKey = document.getElementById("tokenIn").value;
-    const tOutKey = document.getElementById("tokenOut").value;
-
-    const addrIn = DEX_CONFIG.TOKENS[tInKey].address;
-    const addrOut = DEX_CONFIG.TOKENS[tOutKey].address;
-    const amountInWei = ethers.utils.parseUnits(amt.toString(), 18);
-
-    const router = new ethers.Contract(ROUTER_ADDR, ROUTER_ABI, wallet.signer);
-
-    // 1. APPROVE KE ROUTER (BUKAN KE POOL!)
-    log("> APPROVING ROUTER...");
-    const tokenContract = new ethers.Contract(
-      addrIn,
-      ["function approve(address,uint256) returns (bool)"],
-      wallet.signer
-    );
-    const appTx = await tokenContract.approve(ROUTER_ADDR, ethers.constants.MaxUint256);
-    await appTx.wait();
-
-    // 2. HITUNG MIN OUT (SLIPPAGE 3%)
-    const outVal = document.getElementById("amountOut").value;
-    const outWei = ethers.utils.parseUnits(outVal.toString(), 18);
-    const minOut = outWei.mul(97).div(100);
-
-    // 3. SWAP
-    log("> EXECUTING SWAP...");
-    const tx = await router.swap(
-      addrIn,
-      addrOut,
-      amountInWei,
-      minOut,
-      { gasLimit: 300000 }
-    );
-
-    log("> TX HASH: " + tx.hash);
-    await tx.wait();
-
-    log("> SWAP SUCCESS ✅");
-    simulate();
-
-  } catch (err) {
-    log("> ERROR: " + (err.reason || err.message));
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerText = "SWAP";
-    }
-  }
 }
 
-function setupEvents() {
-  ["amountIn", "tokenIn", "tokenOut"].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.oninput = simulate;
-      el.onchange = simulate;
-    }
-  });
-}
+// --- EVENT LISTENERS ---
+document.getElementById('connectBtn').addEventListener('click', connectWallet);
+document.getElementById('swapBtn').addEventListener('click', executeSwap);
 
+// Listener untuk Toggle Native (Ciri khas V2.1)
+document.getElementById('toNativeToggle').addEventListener('change', function() {
+    if(this.checked) {
+        console.log("Mode: Auto-Unwrap ke Native OPN Aktif");
+    }
+});
