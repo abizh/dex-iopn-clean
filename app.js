@@ -1,24 +1,11 @@
-// ==========================================
-// BOZZDEX MASTER LOGIC (FIXED)
-// ==========================================
-
-// --- CONFIG ---
-const RAW_ADDR = {
+const CONFIG = {
     ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
     T_IN: "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84",
     T_OUT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d"
 };
 
-const CONTRACTS = {
-    ROUTER: ethers.getAddress(RAW_ADDR.ROUTER),
-    T_IN: ethers.getAddress(RAW_ADDR.T_IN),
-    T_OUT: ethers.getAddress(RAW_ADDR.T_OUT)
-};
-
 const ABIS = {
-    ROUTER: [
-        "function swap(address tIn, address tOut, uint256 amtIn, uint256 minOut) external"
-    ],
+    ROUTER: ["function swap(address tIn, address tOut, uint256 amtIn, uint256 minOut) external"],
     ERC20: [
         "function approve(address spender, uint256 amount) external returns (bool)",
         "function allowance(address owner, address spender) view returns (uint256)",
@@ -26,152 +13,106 @@ const ABIS = {
     ]
 };
 
-// --- STATE ---
 let provider, signer, userAddress;
 
-// --- LOGGER ---
+// 1. Fungsi Log yang Aman (Cek element dulu)
 function log(msg) {
-    document.getElementById('statusLog').innerText = "> " + msg;
-    console.log("[DEX]", msg);
+    const statusLog = document.getElementById('statusLog');
+    if (statusLog) statusLog.innerText = `> ${msg}`;
+    console.log(`[DEX]: ${msg}`);
 }
 
-// --- INIT ---
-document.addEventListener('DOMContentLoaded', () => {
-
-    const btnConnect = document.getElementById('btnConnect');
-    const btnSwap = document.getElementById('btnSwap');
-    const inputAmt = document.getElementById('inputAmount');
-
-    btnConnect.addEventListener('click', connectWallet);
-    btnSwap.addEventListener('click', executeSwap);
-
-    inputAmt.addEventListener('input', (e) => {
-        document.getElementById('outputAmount').value = e.target.value;
-    });
-
-    checkExistingConnection();
-});
-
-// --- AUTO CONNECT ---
-async function checkExistingConnection() {
-    if (!window.ethereum) return;
-
-    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-
-    if (accounts.length > 0) {
-        userAddress = accounts[0];
+// 2. AUTO-DETECT STATE (Titik Lemah ke-3 kamu)
+async function initAutoConnect() {
+    if (window.ethereum) {
         provider = new ethers.BrowserProvider(window.ethereum);
-        signer = await provider.getSigner();
-
-        updateUI();
-        updateBalances();
-        log("Auto connected");
+        const accounts = await provider.listAccounts();
+        if (accounts.length > 0) {
+            log("Mendeteksi koneksi lama...");
+            await connectWallet(); // Auto connect kalau sudah pernah izin
+        }
     }
 }
 
-// --- CONNECT WALLET ---
+// 3. FUNGSI KONEKSI (Titik Lemah ke-1 & 2)
 async function connectWallet() {
-    if (!window.ethereum) {
-        alert("Install Metamask dulu!");
-        return;
-    }
+    if (!window.ethereum) return alert("Gunakan Browser Metamask/OKX!");
 
     try {
-        log("Connecting wallet...");
-
-        const accounts = await window.ethereum.request({
-            method: 'eth_requestAccounts'
-        });
-
+        log("Menghubungkan...");
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         userAddress = accounts[0];
-
+        
         provider = new ethers.BrowserProvider(window.ethereum);
         signer = await provider.getSigner();
 
-        updateUI();
+        // Update UI secara aman
+        const btnConn = document.getElementById('btnConnect');
+        const badge = document.getElementById('networkBadge');
+        const btnSwp = document.getElementById('btnSwap');
+
+        if (btnConn) btnConn.innerText = `${userAddress.substring(0, 6)}...${userAddress.substring(38)}`;
+        if (badge) {
+            badge.innerText = "Online";
+            badge.style.background = "#238636";
+        }
+        if (btnSwp) btnSwp.disabled = false;
+
+        log("Siap Tempur!");
         updateBalances();
-
-        log("Connected ✔");
-
     } catch (err) {
-        log("Error: " + err.message);
+        log("Koneksi dibatalkan.");
     }
 }
 
-// --- UPDATE UI ---
-function updateUI() {
-    document.getElementById('btnConnect').innerText =
-        userAddress.slice(0,6) + "..." + userAddress.slice(-4);
-
-    document.getElementById('networkBadge').innerText = "Online";
-
-    document.getElementById('btnSwap').disabled = false;
-}
-
-// --- BALANCE ---
 async function updateBalances() {
+    if (!userAddress || !provider) return;
     try {
-        const tIn = new ethers.Contract(CONTRACTS.T_IN, ABIS.ERC20, provider);
-        const tOut = new ethers.Contract(CONTRACTS.T_OUT, ABIS.ERC20, provider);
-
-        const [b1, b2] = await Promise.all([
-            tIn.balanceOf(userAddress),
-            tOut.balanceOf(userAddress)
-        ]);
-
-        document.getElementById('balIn').innerText =
-            "Saldo: " + ethers.formatUnits(b1, 18);
-
-        document.getElementById('balOut').innerText =
-            "Saldo: " + ethers.formatUnits(b2, 18);
-
-    } catch {
-        log("Gagal ambil saldo");
-    }
+        const tIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, provider);
+        const tOut = new ethers.Contract(CONFIG.T_OUT, ABIS.ERC20, provider);
+        const [b1, b2] = await Promise.all([tIn.balanceOf(userAddress), tOut.balanceOf(userAddress)]);
+        
+        if(document.getElementById('balIn')) document.getElementById('balIn').innerText = `Saldo: ${ethers.formatUnits(b1, 18)}`;
+        if(document.getElementById('balOut')) document.getElementById('balOut').innerText = `Saldo: ${ethers.formatUnits(b2, 18)}`;
+    } catch (e) { console.error(e); }
 }
 
-// --- SWAP ---
 async function executeSwap() {
-
-    const val = document.getElementById('inputAmount').value;
-    if (!val || val <= 0) return log("Isi amount dulu");
+    const val = document.getElementById('inputAmount')?.value;
+    if (!val || val <= 0) return log("Input nol!");
 
     try {
-        const amountWei = ethers.parseUnits(val, 18);
+        const amtWei = ethers.parseUnits(val, 18);
+        const tokenIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, signer);
+        const dex = new ethers.Contract(CONFIG.ROUTER, ABIS.ROUTER, signer);
 
-        const token = new ethers.Contract(CONTRACTS.T_IN, ABIS.ERC20, signer);
-        const dex = new ethers.Contract(CONTRACTS.ROUTER, ABIS.ROUTER, signer);
-
-        log("Check allowance...");
-        const allowance = await token.allowance(userAddress, CONTRACTS.ROUTER);
-
-        if (allowance < amountWei) {
-            log("Approve token...");
-            const tx = await token.approve(CONTRACTS.ROUTER, ethers.MaxUint256);
-            await tx.wait();
+        log("Cek Approval...");
+        const allow = await tokenIn.allowance(userAddress, CONFIG.ROUTER);
+        if (allow < amtWei) {
+            log("Minta Izin...");
+            await (await tokenIn.approve(CONFIG.ROUTER, ethers.MaxUint256)).wait();
         }
 
-        log("Swapping...");
-        const tx = await dex.swap(
-            CONTRACTS.T_IN,
-            CONTRACTS.T_OUT,
-            amountWei,
-            0
-        );
-
+        log("Swap dimulai...");
+        const tx = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amtWei, 0);
         await tx.wait();
-
-        log("SWAP SUCCESS 🔥");
+        log("SUKSES!");
+        alert("Swap Berhasil!");
         updateBalances();
-
     } catch (err) {
-        log("Swap failed ❌");
-        console.error(err);
+        log("Gagal: " + (err.reason || "Cek Saldo/Gas"));
     }
 }
 
-// --- EVENT WALLET ---
-if (window.ethereum) {
-    window.ethereum.on('accountsChanged', () => location.reload());
-    window.ethereum.on('chainChanged', () => location.reload());
-}
+// JALANKAN SUTRADARA SAAT PANGGUNG SIAP
+window.onload = () => {
+    initAutoConnect();
+    // Sinkronisasi input box
+    const inBox = document.getElementById('inputAmount');
+    if (inBox) {
+        inBox.oninput = (e) => {
+            const outBox = document.getElementById('outputAmount');
+            if (outBox) outBox.value = e.target.value;
+        };
+    }
+};
