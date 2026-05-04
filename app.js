@@ -1,22 +1,12 @@
-// CONFIGURATION - SINKRON DENGAN REMIX & POOL
-const CONTRACTS = {
-    ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
-    T_IN: "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84", // Token A
-    T_OUT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d" // Token B/wOPN
-};
+// Gunakan fungsi getAddress untuk memastikan format alamat valid
+const T_A_RAW = "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84";
+const T_B_RAW = "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d";
+const ROUTER_RAW = "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961";
 
-const ABIS = {
-    ROUTER: [
-        "function swap(address tIn, address tOut, uint256 amtIn, uint256 minOut) external",
-        "function getPool(address, address) view returns (address)",
-        "function fee() view returns (uint256)"
-    ],
-    ERC20: [
-        "function approve(address spender, uint256 amount) external returns (bool)",
-        "function allowance(address owner, address spender) view returns (uint256)",
-        "function balanceOf(address account) view returns (uint256)",
-        "function decimals() view returns (uint8)"
-    ]
+const CONFIG = {
+    ROUTER: ethers.getAddress(ROUTER_RAW),
+    T_IN: ethers.getAddress(T_A_RAW),
+    T_OUT: ethers.getAddress(T_B_RAW)
 };
 
 let signer = null;
