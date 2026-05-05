@@ -128,6 +128,44 @@ async function updateBalances() {
 }
 
 // ===============================
+// 📡 MIRROR PRICE ENGINE (DEX RESMI)
+// ===============================
+async function getLivePrice() {
+    try {
+        const provider = new ethers.JsonRpcProvider(CONFIG.RPC);
+
+        const router = new ethers.Contract(
+            "0xB489bce5c9c9364da2D1D1Bc5CE4274F63141885", // router resmi
+            ["function getAmountsOut(uint amountIn, address[] memory path) view returns (uint[] memory)"],
+            provider
+        );
+
+        const amountIn = ethers.parseUnits("1", 18); // 1 WOPN
+
+        const path = [
+            CONFIG.T_IN,  // WOPN
+            CONFIG.T_OUT  // OPNT
+        ];
+
+        const amounts = await router.getAmountsOut(amountIn, path);
+
+        const price = ethers.formatUnits(amounts[1], 18);
+
+        // 🔥 tampilkan ke UI
+        const logEl = document.getElementById("statusLog");
+        if (logEl) {
+            logEl.innerText = "> Harga Market: 1 WOPN = " + Number(price).toFixed(6) + " OPNT";
+        }
+
+        return price;
+
+    } catch (err) {
+        console.error("Price error:", err);
+        log("Gagal ambil harga market ❌");
+    }
+            }
+
+// ===============================
 // 🔄 EXECUTE SWAP
 // ===============================
 async function executeSwap() {
@@ -198,3 +236,10 @@ document.addEventListener("DOMContentLoaded", () => {
     
     log("Aplikasi Siap.");
 });
+
+setInterval(() => {
+    if (userAddress) {
+        updateBalances();
+        getLivePrice();
+    }
+}, 10000);
