@@ -1,7 +1,23 @@
-const CONFIG = {
+/**
+ * BOZZDEX V2.1 - MASTER LOGIC
+ * Certification: Kopi Tubruk 5in1 (Verified)
+ * Mode: God-Eye Analytics & Deep Forensic Safety
+ */
+
+// ===============================
+// 🛠️ CONFIGURATION & CONSTANTS
+// ===============================
+const RAW_ADDR = {
     ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
-    T_IN: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84",
+    T_IN: "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84",
     T_OUT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d"
+};
+
+// Safe Checksum Addresses
+const CONFIG = {
+    ROUTER: ethers.getAddress(RAW_ADDR.ROUTER),
+    T_IN: ethers.getAddress(RAW_ADDR.T_IN),
+    T_OUT: ethers.getAddress(RAW_ADDR.T_OUT)
 };
 
 const ABIS = {
@@ -9,39 +25,20 @@ const ABIS = {
     ERC20: [
         "function approve(address spender, uint256 amount) external returns (bool)",
         "function allowance(address owner, address spender) view returns (uint256)",
-        "function balanceOf(address account) view returns (uint256)"
+        "function balanceOf(address account) view returns (uint256)",
+        "function decimals() view returns (uint8)"
     ]
 };
 
-let provider, signer, userAddress;
-
-// Fungsi Log yang Aman (Cek element dulu)
-function log(msg) {
-    const statusLog = document.getElementById('statusLog');
-    if (statusLog) statusLog.innerText = `> ${msg}`;
-    console.log(`[DEX]: ${msg}`);
-}
-
-//  AUTO-DETECT STATE (Titik Lemah ke-3 kamu)
-async function initAutoConnect() {
-    if (window.ethereum) {
-        provider = new ethers.BrowserProvider(window.ethereum);
-        const accounts = await provider.listAccounts();
-        if (accounts.length > 0) {
-            log("Mendeteksi koneksi lama...");
-            await connectWallet(); // Auto connect kalau sudah pernah izin
-        }
-    }
-}
-
 // ===============================
-// 🔥 GLOBAL STATE
+// 🔥 GLOBAL STATE & SECURITY GUARDS
 // ===============================
 let provider, signer, userAddress;
-let balanceInterval = null;
+let tokenDecimals = 18; // Standard fallback
+let isBlockListenerActive = false;
 
 // ===============================
-// 🧠 LOGGER AMAN
+// 🧠 SYSTEM LOGGER (UI FEEDBACK)
 // ===============================
 function log(msg) {
     const statusLog = document.getElementById('statusLog');
@@ -50,199 +47,185 @@ function log(msg) {
 }
 
 // ===============================
-// 🔄 AUTO CONNECT (CEK SESSION)
+// 🛡️ UTILS & DATA SANITIZATION
 // ===============================
-async function initAutoConnect() {
-    if (!window.ethereum) return;
+// Mencegah crash parseUnits akibat desimal berlebih
+function sanitizeInput(val, dec) {
+    if (!val.includes(".")) return val;
+    const parts = val.split(".");
+    if (parts[1].length > dec) return parts[0] + "." + parts[1].slice(0, dec);
+    return val;
+}
 
-    try {
-        provider = new ethers.BrowserProvider(window.ethereum);
-        const accounts = await provider.listAccounts();
-
-        if (accounts.length > 0) {
-            log("Mendeteksi koneksi lama...");
-            await connectWallet();
-        }
-    } catch (err) {
-        console.error("AutoConnect Error:", err);
-    }
+// Format saldo tanpa pembulatan Number() yang merusak presisi
+function formatSafe(val, dec) {
+    const full = ethers.formatUnits(val, dec);
+    const parts = full.split(".");
+    if (parts.length > 1) return parts[0] + "." + parts[1].slice(0, 4);
+    return full;
 }
 
 // ===============================
-// ⚙️ START AUTO BALANCE REFRESH
-// ===============================
-function startAutoUpdate() {
-    if (balanceInterval) clearInterval(balanceInterval);
-
-    // refresh tiap 10 detik
-    balanceInterval = setInterval(() => {
-        updateBalances();
-    }, 10000);
-}
-
-// ===============================
-// 🔌 CONNECT WALLET (FINAL FIX)
+// 🔌 CONNECTIVITY ENGINE (GOD-EYE)
 // ===============================
 async function connectWallet() {
-    if (!window.ethereum) {
-        alert("Gunakan Browser Metamask / OKX!");
-        return;
-    }
+    if (!window.ethereum) return alert("Buka di Browser Metamask/OKX App!");
 
     try {
-        log("Menghubungkan wallet...");
-
-        // request akun
-        const accounts = await window.ethereum.request({
-            method: 'eth_requestAccounts'
-        });
-
+        log("Memicu Metamask...");
+        
+        // Rapid Account Request
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         userAddress = accounts[0];
 
-        // setup provider & signer
+        // Background Provider Setup
         provider = new ethers.BrowserProvider(window.ethereum);
         signer = await provider.getSigner();
 
-        // 🔥 paksa sinkronisasi network
-        await provider.getNetwork();
-
-        // ===============================
-        // 🎨 UPDATE UI
-        // ===============================
+        // Update UI State
         const btnConn = document.getElementById('btnConnect');
+        if (btnConn) btnConn.innerText = `${userAddress.substring(0, 6)}...${userAddress.substring(38)}`;
+        
         const badge = document.getElementById('networkBadge');
-        const btnSwap = document.getElementById('btnSwap');
+        if (badge) { badge.innerText = "Online"; badge.style.background = "#238636"; }
+        
+        const btnSwp = document.getElementById('btnSwap');
+        if (btnSwp) btnSwp.disabled = false;
 
-        if (btnConn) {
-            btnConn.innerText =
-                userAddress.substring(0, 6) +
-                "..." +
-                userAddress.substring(38);
-        }
-
-        if (badge) {
-            badge.innerText = "Online";
-            badge.style.background = "#238636";
-        }
-
-        if (btnSwap) btnSwap.disabled = false;
-
-        log("Wallet terhubung ✅");
-
-        // ===============================
-        // 💰 LOAD BALANCE AWAL
-        // ===============================
+        log("Koneksi Stabil ✅");
+        
+        // Sync Data
         await updateBalances();
-
-        // ===============================
-        // 🔄 AUTO REFRESH BALANCE
-        // ===============================
-        startAutoUpdate();
-
-        // ===============================
-        // ⚡ REALTIME MODE (OPTIONAL PRO)
-        // ===============================
-        provider.on("block", () => {
-            updateBalances();
-        });
+        
+        // Anti-Duplicate Block Listener
+        if (!isBlockListenerActive) {
+            provider.on("block", () => {
+                console.log("Syncing New Block...");
+                updateBalances();
+            });
+            isBlockListenerActive = true;
+        }
 
     } catch (err) {
+        log(err.code === 4001 ? "User menolak izin ❌" : "Error koneksi ❌");
         console.error(err);
+    }
+}
 
-        if (err.code === 4001) {
-            log("User menolak koneksi ❌");
-        } else {
-            log("Gagal koneksi wallet ❌");
+// Session Recovery
+async function initAutoConnect() {
+    if (window.ethereum) {
+        const tempProv = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await tempProv.listAccounts();
+        if (accounts.length > 0) {
+            log("Memulihkan sesi...");
+            await connectWallet();
         }
     }
 }
 
+// ===============================
+// 💰 BALANCE ENGINE (PARTIAL SYNC)
+// ===============================
 async function updateBalances() {
-    if (!userAddress || !provider) {
-        log("Provider / Wallet belum siap...");
-        return;
+    if (!userAddress || !provider) return;
+
+    const fetchToken = async (addr, configAddr) => {
+        try {
+            const contract = new ethers.Contract(configAddr, ABIS.ERC20, provider);
+            const [bal, dec] = await Promise.all([
+                contract.balanceOf(addr),
+                contract.decimals()
+            ]);
+            return { bal, dec };
+        } catch (e) { return null; }
+    };
+
+    // Parallel fetch dengan pengaman individual
+    const [resIn, resOut] = await Promise.all([
+        fetchToken(userAddress, CONFIG.T_IN),
+        fetchToken(userAddress, CONFIG.T_OUT)
+    ]);
+
+    if (resIn) {
+        tokenDecimals = resIn.dec; // Sync decimals untuk swap
+        const elIn = document.getElementById('balIn');
+        if (elIn) elIn.innerText = `Saldo: ${formatSafe(resIn.bal, resIn.dec)}`;
     }
 
-    try {
-        log("Mengambil saldo token...");
-
-        const tIn = new ethers.Contract(CONFIG.T_IN, [
-            ...ABIS.ERC20,
-            "function decimals() view returns (uint8)"
-        ], provider);
-
-        const tOut = new ethers.Contract(CONFIG.T_OUT, [
-            ...ABIS.ERC20,
-            "function decimals() view returns (uint8)"
-        ], provider);
-
-        // 🔥 Ambil balance + decimals sekaligus
-        const [b1, b2, d1, d2] = await Promise.all([
-            tIn.balanceOf(userAddress),
-            tOut.balanceOf(userAddress),
-            tIn.decimals(),
-            tOut.decimals()
-        ]);
-
-        // 🔥 Format sesuai decimals asli
-        const formatted1 = ethers.formatUnits(b1, d1);
-        const formatted2 = ethers.formatUnits(b2, d2);
-
-        // 🔥 Update UI
-        const elIn = document.getElementById('balIn');
+    if (resOut) {
         const elOut = document.getElementById('balOut');
-
-        if (elIn) elIn.innerText = `Saldo: ${Number(formatted1).toFixed(4)}`;
-        if (elOut) elOut.innerText = `Saldo: ${Number(formatted2).toFixed(4)}`;
-
-        log("Saldo berhasil diperbarui ");
-
-    } catch (err) {
-        console.error(err);
-
-        log("Gagal ambil saldo, retry 2 detik...");
-
-        // Retry otomatis (biar ga dead)
-        setTimeout(updateBalances, 2000);
+        if (elOut) elOut.innerText = `Saldo: ${formatSafe(resOut.bal, resOut.dec)}`;
     }
 }
 
+// ===============================
+// 🚀 SWAP ENGINE (ROBUST EXECUTION)
+// ===============================
 async function executeSwap() {
-    const val = document.getElementById('inputAmount')?.value;
-    if (!val || val <= 0) return log("Input nol!");
+    const rawVal = document.getElementById('inputAmount')?.value;
+    if (!rawVal || rawVal <= 0) return log("Masukkan jumlah valid!");
 
     try {
-        const amtWei = ethers.parseUnits(val, 18);
-        const tokenIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, signer);
-        const dex = new ethers.Contract(CONFIG.ROUTER, ABIS.ROUTER, signer);
+        // Refresh Signer (Proteksi sesi basi)
+        const currentProvider = new ethers.BrowserProvider(window.ethereum);
+        const currentSigner = await currentProvider.getSigner();
 
-        log("Cek Approval...");
-        const allow = await tokenIn.allowance(userAddress, CONFIG.ROUTER);
-        if (allow < amtWei) {
-            log("Minta Izin...");
-            await (await tokenIn.approve(CONFIG.ROUTER, ethers.MaxUint256)).wait();
+        // Sanitize & Parse
+        const cleanVal = sanitizeInput(rawVal, tokenDecimals);
+        const amtWei = ethers.parseUnits(cleanVal, tokenDecimals);
+
+        const tokenIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, currentSigner);
+        const dex = new ethers.Contract(CONFIG.ROUTER, ABIS.ROUTER, currentSigner);
+
+        // 1. Logic Allowance
+        log("Mengecek Approval...");
+        const allowance = await tokenIn.allowance(userAddress, CONFIG.ROUTER);
+        
+        if (allowance < amtWei) {
+            log("Menunggu Approval...");
+            const txApp = await tokenIn.approve(CONFIG.ROUTER, ethers.MaxUint256);
+            await txApp.wait();
+            log("Approval Sukses!");
         }
 
-        log("Swap dimulai...");
-        const tx = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amtWei, 0);
-        await tx.wait();
-        log("SUKSES!");
-        alert("Swap Berhasil!");
+        // 2. Logic Swap
+        log("Memproses Swap...");
+        const txSwap = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amtWei, 0);
+        log("Menunggu Konfirmasi...");
+        await txSwap.wait();
+        
+        log("SWAP SUCCESS 🔥");
+        alert("Transaksi Berhasil!");
         updateBalances();
+
     } catch (err) {
-        log("Gagal: " + (err.reason || "Cek Saldo/Gas"));
+        // Advanced Error Extraction
+        let errMsg = err.reason || err.message;
+        if (err.data && err.data.message) errMsg = err.data.message;
+        log("Gagal: " + (errMsg.includes("insufficient") ? "Saldo/Gas Tidak Cukup" : errMsg));
+        console.error(err);
     }
 }
 
-// JALANKAN SUTRADARA SAAT PANGGUNG SIAP
+// ===============================
+// 🎬 DOM INITIALIZATION
+// ===============================
 window.onload = () => {
     initAutoConnect();
-    // Sinkronisasi input box
-    const inBox = document.getElementById('inputAmount');
-    if (inBox) {
-        inBox.oninput = (e) => {
-            const outBox = document.getElementById('outputAmount');
-            if (outBox) outBox.value = e.target.value;
+
+    // UI Linkage
+    const inputAmt = document.getElementById('inputAmount');
+    if (inputAmt) {
+        inputAmt.oninput = (e) => {
+            const outAmt = document.getElementById('outputAmount');
+            if (outAmt) outAmt.value = e.target.value; // Estimasi 1:1 untuk UI
         };
+    }
+
+    // Event Watchers for Metamask
+    if (window.ethereum) {
+        window.ethereum.on('accountsChanged', () => window.location.reload());
+        window.ethereum.on('chainChanged', () => window.location.reload());
     }
 };
