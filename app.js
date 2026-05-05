@@ -1,3 +1,5 @@
+// console.log("ETHERS CHECK:", typeof ethers);
+
 // ===============================
 // ⚙️ CONFIG
 // ===============================
@@ -67,12 +69,17 @@ async function connect() {
         }
 
         // UI update
+        console.log("Provider test jalan...");
+const testProvider = new ethers.JsonRpcProvider(CONFIG.RPC);
+const block = await testProvider.getBlockNumber();
+console.log("BLOCK:", block);
+        
         document.getElementById("btnConnect").innerText =
             userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
 
         document.getElementById("btnSwap").disabled = false;
 
-        log("Wallet connected ✅");
+        log("Wallet connected");
 
         // LOAD BALANCE
         await updateBalances();
