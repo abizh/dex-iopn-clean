@@ -1,9 +1,10 @@
 /**
- * BOZZDEX V2.1 - FINAL STABLE BUILD
+ * BOZZDEX V2.1 - MASTER CODE UTUH
+ * Sinkronisasi Total: UI & Blockchain
  */
 
 // ===============================
-// CONFIG
+// CONFIG (Sesuai OPN Testnet)
 // ===============================
 const CONFIG = {
     ROUTER: ethers.getAddress("0x98cbC837fD05cA7b0ed075990667E93ae0EE1961"),
@@ -22,7 +23,7 @@ const ABIS = {
 };
 
 // ===============================
-// STATE
+// GLOBAL STATE
 // ===============================
 let provider = null;
 let signer = null;
@@ -39,50 +40,64 @@ function log(msg) {
 }
 
 // ===============================
-// WALLET CONNECT
+// WALLET CONNECT ENGINE
 // ===============================
 async function connectWallet() {
     if (!window.ethereum) {
-        alert("Gunakan Metamask / OKX Wallet");
+        alert("Gunakan Metamask / OKX Wallet bray!");
         return;
     }
 
     try {
         log("Meminta koneksi...");
 
+        // Trigger pop-up dompet
         const accounts = await window.ethereum.request({
             method: "eth_requestAccounts"
         });
 
-        if (!accounts.length) throw new Error("No account");
+        if (!accounts || accounts.length === 0) {
+            log("Koneksi ditolak ❌");
+            return;
+        }
 
         userAddress = accounts[0];
-
+        
+        // Re-init provider untuk ethers v6
         provider = new ethers.BrowserProvider(window.ethereum);
         signer = await provider.getSigner();
 
-        // UI Update
-        document.getElementById("btnConnect").innerText =
-            userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
-
-        const badge = document.getElementById("networkBadge");
-        badge.innerText = "Online";
-        badge.style.background = "#238636";
-
-        document.getElementById("btnSwap").disabled = false;
+        // Update UI secara masif
+        updateUI(userAddress);
 
         log("Wallet terhubung ✅");
 
+        // Ambil data terbaru
         await updateBalances();
 
     } catch (err) {
         log("Error koneksi ❌");
-        console.error(err);
+        console.error("Forensic Error:", err);
     }
 }
 
+// Helper untuk UI agar kode lebih bersih
+function updateUI(address) {
+    const btn = document.getElementById("btnConnect");
+    if (btn) btn.innerText = address.slice(0, 6) + "..." + address.slice(-4);
+
+    const badge = document.getElementById("networkBadge");
+    if (badge) {
+        badge.innerText = "Online";
+        badge.style.background = "#238636";
+    }
+
+    const swapBtn = document.getElementById("btnSwap");
+    if (swapBtn) swapBtn.disabled = false;
+}
+
 // ===============================
-// AUTO CONNECT (AMAN)
+// AUTO RECONNECT (GOD-EYE MODE)
 // ===============================
 async function initAutoConnect() {
     if (!window.ethereum) return;
@@ -91,27 +106,24 @@ async function initAutoConnect() {
         provider = new ethers.BrowserProvider(window.ethereum);
         const accounts = await provider.listAccounts();
 
-        if (accounts.length > 0) {
+        if (accounts && accounts.length > 0) {
+            // Fix ethers v6: listAccounts balikin array objek account
             userAddress = accounts[0].address;
             signer = await provider.getSigner();
 
-            log("Auto reconnect...");
-
-            document.getElementById("btnConnect").innerText =
-                userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
-
-            document.getElementById("networkBadge").innerText = "Online";
-            document.getElementById("btnSwap").disabled = false;
-
+            log("Memulihkan sesi...");
+            updateUI(userAddress);
             await updateBalances();
+        } else {
+            log("Siap beraksi, bray...");
         }
     } catch (err) {
-        console.error(err);
+        console.error("Silent Init Error:", err);
     }
 }
 
 // ===============================
-// BALANCE ENGINE (FIXED)
+// BALANCE & DECIMALS ENGINE
 // ===============================
 async function updateBalances() {
     if (!userAddress || !provider) return;
@@ -120,6 +132,7 @@ async function updateBalances() {
         const tIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, provider);
         const tOut = new ethers.Contract(CONFIG.T_OUT, ABIS.ERC20, provider);
 
+        // Ambil paralel biar kenceng bray
         const [b1, d1, b2, d2] = await Promise.all([
             tIn.balanceOf(userAddress),
             tIn.decimals(),
@@ -127,75 +140,89 @@ async function updateBalances() {
             tOut.decimals()
         ]);
 
-        tokenDecimals = d1;
+        tokenDecimals = Number(d1);
 
-        document.getElementById("balIn").innerText =
-            "Saldo: " + ethers.formatUnits(b1, d1).slice(0, 10);
+        const elIn = document.getElementById("balIn");
+        if (elIn) elIn.innerText = "Saldo: " + ethers.formatUnits(b1, d1).slice(0, 10);
 
-        document.getElementById("balOut").innerText =
-            "Saldo: " + ethers.formatUnits(b2, d2).slice(0, 10);
+        const elOut = document.getElementById("balOut");
+        if (elOut) elOut.innerText = "Saldo: " + ethers.formatUnits(b2, d2).slice(0, 10);
 
     } catch (err) {
-        log("Gagal ambil saldo");
-        console.error(err);
+        console.error("Gagal ambil saldo bray:", err);
     }
 }
 
 // ===============================
-// SWAP ENGINE
+// SWAP ENGINE (FINAL SAFETY)
 // ===============================
 async function executeSwap() {
-    const val = document.getElementById("inputAmount").value;
-    if (!val || val <= 0) return log("Input kosong!");
+    const inputVal = document.getElementById("inputAmount").value;
+    if (!inputVal || inputVal <= 0) {
+        log("Input tidak valid!");
+        return;
+    }
 
     try {
-        const amt = ethers.parseUnits(val, tokenDecimals);
+        log("Menyiapkan transaksi...");
+        
+        // Proteksi presisi
+        const amt = ethers.parseUnits(inputVal.toString(), tokenDecimals);
 
         const token = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, signer);
         const dex = new ethers.Contract(CONFIG.ROUTER, ABIS.ROUTER, signer);
 
-        log("Cek approval...");
-
+        log("Cek izin (Allowance)...");
         const allowance = await token.allowance(userAddress, CONFIG.ROUTER);
 
         if (allowance < amt) {
             log("Approve token...");
-            await (await token.approve(CONFIG.ROUTER, ethers.MaxUint256)).wait();
+            const txApp = await token.approve(CONFIG.ROUTER, ethers.MaxUint256);
+            log("Tunggu approval...");
+            await txApp.wait();
+            log("Approval sukses!");
         }
 
-        log("Swap jalan...");
+        log("Memulai Swap...");
+        const txSwap = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amt, 0);
+        
+        log("Menunggu blok...");
+        await txSwap.wait();
 
-        const tx = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amt, 0);
-        await tx.wait();
-
-        log("Swap sukses 🔥");
-        updateBalances();
+        log("Swap sukses bray! 🔥🚀");
+        
+        // Refresh saldo otomatis
+        await updateBalances();
 
     } catch (err) {
         log("Swap gagal ❌");
-        console.error(err);
+        console.error("Swap Error:", err);
     }
 }
 
 // ===============================
-// INIT (SATU PINTU)
+// MASTER INITIALIZER
 // ===============================
-window.addEventListener("load", () => {
-
+window.addEventListener("DOMContentLoaded", () => {
+    
+    // Jalankan auto-detect sesegera mungkin
     initAutoConnect();
 
-    // input sync
-    const input = document.getElementById("inputAmount");
-    input.addEventListener("input", (e) => {
-        document.getElementById("outputAmount").value = e.target.value;
-    });
-
-    // wallet listener
-    if (window.ethereum) {
-        window.ethereum.on("accountsChanged", () => location.reload());
-        window.ethereum.on("chainChanged", () => location.reload());
+    // Link input bray (UI Sync)
+    const inputAmt = document.getElementById("inputAmount");
+    const outputAmt = document.getElementById("outputAmount");
+    if (inputAmt && outputAmt) {
+        inputAmt.addEventListener("input", (e) => {
+            outputAmt.value = e.target.value; // Estimasi 1:1
+        });
     }
 
-    // 🔥 auto refresh balance (BONUS UX)
-    setInterval(updateBalances, 10000);
+    // Wallet Listener (Hanya jika ethereum ada)
+    if (window.ethereum) {
+        window.ethereum.on("accountsChanged", () => window.location.reload());
+        window.ethereum.on("chainChanged", () => window.location.reload());
+    }
+
+    // Refresh saldo tiap 15 detik biar data tetep segar
+    setInterval(updateBalances, 15000);
 });
