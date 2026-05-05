@@ -2,7 +2,7 @@
 // ⚙️ CONFIG
 // ===============================
 const CONFIG = {
-    RPC: "https://testnet-rpc.iopn.tech",
+    RPC: "https://testnet-rpc2.iopn.tech",
     CHAIN_ID: "0x3d8", // 984
     T_IN: ethers.getAddress("0xbc022c9deb5af250a526321d16ef52e39b4dbd84"),
     T_OUT: ethers.getAddress("0x2aec1db9197ff284011a6a1d0752ad03f5782b0d")
@@ -32,8 +32,6 @@ function log(msg) {
 // ===============================
 // 🔗 CONNECT WALLET (FIX TOTAL)
 // ===============================
-let balanceInterval = null;
-
 async function connect() {
     if (!window.ethereum) {
         alert("Gunakan MetaMask / OKX Wallet!");
@@ -43,79 +41,30 @@ async function connect() {
     try {
         log("Menghubungkan wallet...");
 
-        // 1. Request akun
+        // Request akun
         const accounts = await window.ethereum.request({
             method: "eth_requestAccounts"
         });
 
-        if (!accounts || accounts.length === 0) {
-            throw new Error("User tidak memilih akun");
-        }
-
         userAddress = accounts[0];
 
-        // 2. Provider dari wallet
+        // Wallet provider
         walletProvider = new ethers.BrowserProvider(window.ethereum);
         signer = await walletProvider.getSigner();
 
-        // 3. Provider RPC (untuk baca data stabil)
+        // RPC provider (INDEPENDENT)
         rpcProvider = new ethers.JsonRpcProvider(CONFIG.RPC);
 
-        // 4. Validasi jaringan
-        let chainId = await window.ethereum.request({ method: "eth_chainId" });
+        // VALIDASI CHAIN
+        const chainId = await window.ethereum.request({ method: "eth_chainId" });
 
         if (chainId !== CONFIG.CHAIN_ID) {
             log("Switch ke iOPN...");
-
-            try {
-                await window.ethereum.request({
-                    method: "wallet_switchEthereumChain",
-                    params: [{ chainId: CONFIG.CHAIN_ID }]
-                });
-
-                // refresh chainId setelah switch
-                chainId = await window.ethereum.request({ method: "eth_chainId" });
-
-            } catch (switchError) {
-                log("Gagal switch network ❌");
-                console.error(switchError);
-                return;
-            }
+            await window.ethereum.request({
+                method: "wallet_switchEthereumChain",
+                params: [{ chainId: CONFIG.CHAIN_ID }]
+            });
         }
-
-        // 5. Update UI
-        const btn = document.getElementById("btnConnect");
-        const swapBtn = document.getElementById("btnSwap");
-
-        if (btn) {
-            btn.innerText =
-                userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
-        }
-
-        if (swapBtn) swapBtn.disabled = false;
-
-        log("Wallet connected ✅");
-
-        // 6. Load balance pertama
-        await updateBalances();
-
-        // 7. AUTO REFRESH (anti dobel interval)
-        if (!balanceInterval) {
-            balanceInterval = setInterval(async () => {
-                try {
-                    await updateBalances();
-                    log("Auto refresh balance 🔄");
-                } catch (e) {
-                    console.error(e);
-                }
-            }, 10000);
-        }
-
-    } catch (err) {
-        log("Error koneksi ❌");
-        console.error(err);
-    }
-    }
 
         // UI update
         document.getElementById("btnConnect").innerText =
