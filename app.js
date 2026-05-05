@@ -152,10 +152,8 @@ async function getLivePrice() {
         const price = ethers.formatUnits(amounts[1], 18);
 
         // 🔥 tampilkan ke UI
-        const logEl = document.getElementById("statusLog");
-        if (logEl) {
-            logEl.innerText = "> Harga Market: 1 WOPN = " + Number(price).toFixed(6) + " OPNT";
-        }
+        const logEl = document.getElementById("marketPrice").innerText =
+   "Market: 1 WOPN = " + Number(price).toFixed(6) + " OPNT";
 
         return price;
 
