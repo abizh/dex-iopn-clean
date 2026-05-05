@@ -106,27 +106,58 @@ async function connectWallet() {
 }
 
 // ===============================
-// BALANCE ENGINE
+// BALANCE ENGINE (OPTIMIZED)
 // ===============================
 async function updateBalances() {
     if (!userAddress || !provider) return;
+    
     try {
-        const cIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, provider);
-        const cOut = new ethers.Contract(CONFIG.T_OUT, ABIS.ERC20, provider);
+        // Pastikan kita pakai provider terbaru
+        const currentProvider = new ethers.BrowserProvider(window.ethereum);
+        const cIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, currentProvider);
+        const cOut = new ethers.Contract(CONFIG.T_OUT, ABIS.ERC20, currentProvider);
 
-        const [b1, d1, b2] = await Promise.all([
+        // Ambil data secara paralel
+        const [b1, d1, b2, d2] = await Promise.all([
             cIn.balanceOf(userAddress),
             cIn.decimals(),
-            cOut.balanceOf(userAddress)
+            cOut.balanceOf(userAddress),
+            cOut.decimals()
         ]);
 
         decimalsIn = Number(d1);
-        document.getElementById("balIn").innerText = "Saldo: " + ethers.formatUnits(b1, d1);
-        document.getElementById("balOut").innerText = "Saldo: " + ethers.formatUnits(b2, 18);
+
+        // Formatting saldo dengan presisi 4 angka di belakang titik
+        const formatBal = (val, dec) => {
+            const formatted = ethers.formatUnits(val, dec);
+            return parseFloat(formatted).toFixed(4); 
+        };
+
+        // Update UI - Paksa ganti koma jadi titik jika ada
+        const balInVal = formatBal(b1, d1).replace(',', '.');
+        const balOutVal = formatBal(b2, d2).replace(',', '.');
+
+        document.getElementById("balIn").innerText = "Saldo: " + balInVal;
+        document.getElementById("balOut").innerText = "Saldo: " + balOutVal;
+
+        console.log("Balance Sync Success:", { balInVal, balOutVal });
     } catch (e) { 
         console.error("Balance Error:", e);
+        // Retry sekali lagi setelah 2 detik kalau gagal
+        setTimeout(updateBalances, 2000);
     }
 }
+
+// ===============================
+// INPUT SYNC (ANTI-KOMA)
+// ===============================
+// Cari bagian DOMContentLoaded lo, dan ganti input oninput-nya:
+input.oninput = (e) => {
+    // Ambil value, ganti koma ke titik secara real-time
+    let val = e.target.value.replace(',', '.');
+    e.target.value = val; // Set balik ke input agar tetap titik
+    document.getElementById("outputAmount").value = val;
+};
 
 // ===============================
 // SWAP ENGINE
