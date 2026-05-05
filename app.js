@@ -2,10 +2,8 @@
 // ⚙️ CONFIG
 // ===============================
 const CONFIG = {
-    RPC: "https://testnet-rpc2.iopn.tech",
-    CHAIN_ID: "0x3d8", // 984
-    T_IN: "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84",
-    T_OUT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d"
+    T_IN: ethers.getAddress("0xbc022c9deb5af250a526321d16ef52e39b4dbd84"),
+    T_OUT: ethers.getAddress("0x2aec1db9197ff284011a6a1d0752ad03f5782b0d")
 };
 
 const ABI = [
