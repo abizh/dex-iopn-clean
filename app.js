@@ -1,25 +1,40 @@
 /**
- * BOZZDEX V2.4 - THE GOD-EYE FIX
+ * BOZZDEX V2.6 - VALIDATED FROM EXPLORER
+ * Source: testnet.iopn.tech
  */
 
+// ===============================
+// DATA RESMI (VALIDATED)
+// ===============================
 const CONFIG = {
+    CHAIN_ID: "0x3d8", // 984
+    CHAIN_NAME: "OPN Testnet",
+    RPC_URL: "https://testnet-rpc2.iopn.tech",
+    EXPLORER: "https://testnet.iopn.tech",
+    SYMBOL: "OPN",
+    
+    // ALAMAT KONTRAK (VERIFIED FROM EXPLORER)
     ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
-    T_IN: "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84",
-    T_OUT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d"
+    T_IN: "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84",   // Wrapped OPN (WOPN)
+    T_OUT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d"  // OPN Testnet (OPNT)
 };
 
-const ERC20_ABI = [
-    "function balanceOf(address) view returns (uint256)",
-    "function decimals() view returns (uint8)",
-    "function approve(address,uint256) external returns (bool)",
-    "function allowance(address,address) view returns (uint256)"
-];
-
-const ROUTER_ABI = ["function swap(address,address,uint256,uint256) external"];
+const ABIS = {
+    ROUTER: ["function swap(address,address,uint256,uint256) external"],
+    ERC20: [
+        "function balanceOf(address) view returns (uint256)",
+        "function decimals() view returns (uint8)",
+        "function approve(address,uint256) external returns (bool)",
+        "function allowance(address,address) view returns (uint256)"
+    ]
+};
 
 let provider, signer, userAddress;
 let decimalsIn = 18;
 
+// ===============================
+// LOGGER
+// ===============================
 function log(msg, err = false) {
     const el = document.getElementById("statusLog");
     if (el) {
@@ -28,43 +43,76 @@ function log(msg, err = false) {
     }
 }
 
-async function connectWallet() {
-    if (!window.ethereum) return alert("Buka di App Metamask/OKX!");
-
+// ===============================
+// NETWORK GUARD
+// ===============================
+async function switchNetwork() {
     try {
-        log("Membuka dompet...");
-        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-        userAddress = accounts[0];
-
-        // RE-INIT PROVIDER (V6 STABLE)
-        provider = new ethers.BrowserProvider(window.ethereum);
-        
-        // PASTIIN NETWORK KONEK DULU
-        await provider.getNetwork();
-        
-        // AMBIL SIGNER SECARA ASYNC
-        signer = await provider.getSigner();
-
-        // UPDATE UI
-        document.getElementById("btnConnect").innerText = userAddress.slice(0,6)+"..."+userAddress.slice(-4);
-        document.getElementById("networkBadge").innerText = "Online";
-        document.getElementById("networkBadge").style.background = "#238636";
-        document.getElementById("btnSwap").disabled = false;
-
-        log("Wallet Terhubung! ✅");
-        await updateBalances();
-
-    } catch (err) {
-        log("Error: " + (err.message.slice(0,25)), true);
-        console.error(err);
+        await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: CONFIG.CHAIN_ID }],
+        });
+    } catch (error) {
+        if (error.code === 4902) {
+            await window.ethereum.request({
+                method: 'wallet_addEthereumChain',
+                params: [{
+                    chainId: CONFIG.CHAIN_ID,
+                    chainName: CONFIG.CHAIN_NAME,
+                    rpcUrls: [CONFIG.RPC_URL],
+                    nativeCurrency: { name: "OPN", symbol: CONFIG.SYMBOL, decimals: 18 },
+                    blockExplorerUrls: [CONFIG.EXPLORER]
+                }],
+            });
+        }
     }
 }
 
+// ===============================
+// WALLET CORE
+// ===============================
+async function connectWallet() {
+    if (!window.ethereum) return alert("Gunakan Metamask / OKX Wallet!");
+
+    try {
+        log("Sinkronisasi Jaringan...");
+        await switchNetwork();
+
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        userAddress = accounts[0];
+
+        provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.getNetwork();
+        signer = await provider.getSigner();
+
+        // UI SYNC
+        const btn = document.getElementById("btnConnect");
+        if (btn) btn.innerText = userAddress.slice(0,6)+"..."+userAddress.slice(-4);
+        
+        const badge = document.getElementById("networkBadge");
+        if (badge) {
+            badge.innerText = "OPN ONLINE";
+            badge.style.background = "#238636";
+        }
+
+        document.getElementById("btnSwap").disabled = false;
+
+        log("Terhubung ke OPN Testnet ✅");
+        await updateBalances();
+
+    } catch (err) {
+        log("Gagal konek: " + err.message.slice(0,20), true);
+    }
+}
+
+// ===============================
+// BALANCE ENGINE
+// ===============================
 async function updateBalances() {
     if (!userAddress || !provider) return;
     try {
-        const cIn = new ethers.Contract(CONFIG.T_IN, ERC20_ABI, provider);
-        const cOut = new ethers.Contract(CONFIG.T_OUT, ERC20_ABI, provider);
+        const cIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, provider);
+        const cOut = new ethers.Contract(CONFIG.T_OUT, ABIS.ERC20, provider);
 
         const [b1, d1, b2] = await Promise.all([
             cIn.balanceOf(userAddress),
@@ -75,40 +123,48 @@ async function updateBalances() {
         decimalsIn = Number(d1);
         document.getElementById("balIn").innerText = "Saldo: " + ethers.formatUnits(b1, d1);
         document.getElementById("balOut").innerText = "Saldo: " + ethers.formatUnits(b2, 18);
-    } catch (e) { console.log(e); }
+    } catch (e) { 
+        console.error("Balance Error:", e);
+    }
 }
 
+// ===============================
+// SWAP ENGINE
+// ===============================
 async function executeSwap() {
     const val = document.getElementById("inputAmount").value;
     if (!val || val <= 0) return log("Input Kosong!", true);
 
     try {
-        log("Proses Swap...");
+        log("Menyiapkan Transaksi...");
         const amt = ethers.parseUnits(val.toString(), decimalsIn);
-        const tIn = new ethers.Contract(CONFIG.T_IN, ERC20_ABI, signer);
-        const dex = new ethers.Contract(CONFIG.ROUTER, ROUTER_ABI, signer);
+        const tIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, signer);
+        const dex = new ethers.Contract(CONFIG.ROUTER, ABIS.ROUTER, signer);
 
-        log("Cek Approval...");
+        log("Mengecek Izin (Allowance)...");
         const allowance = await tIn.allowance(userAddress, CONFIG.ROUTER);
         
         if (allowance < amt) {
-            log("Approve Token...");
-            const tx = await tIn.approve(CONFIG.ROUTER, ethers.MaxUint256);
-            await tx.wait();
+            log("Meminta Persetujuan Token...");
+            const txA = await tIn.approve(CONFIG.ROUTER, ethers.MaxUint256);
+            await txA.wait();
         }
 
-        log("Kirim Swap...");
+        log("Melakukan Swap...");
         const txS = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amt, 0);
+        log("Menunggu Konfirmasi...");
         await txS.wait();
 
-        log("Sukses! 🔥🚀");
-        updateBalances();
+        log("Swap Berhasil! 🔥");
+        await updateBalances();
     } catch (e) {
-        log("Gagal!", true);
+        log("Transaksi Gagal ❌", true);
     }
 }
 
-// SATU PINTU INITIALIZER
+// ===============================
+// INITIALIZER
+// ===============================
 document.addEventListener("DOMContentLoaded", () => {
     const btn = document.getElementById("btnConnect");
     const swap = document.getElementById("btnSwap");
@@ -116,14 +172,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (btn) btn.onclick = connectWallet;
     if (swap) swap.onclick = executeSwap;
-    if (input) input.oninput = (e) => {
-        document.getElementById("outputAmount").value = e.target.value;
-    };
+    if (input) {
+        input.oninput = (e) => {
+            document.getElementById("outputAmount").value = e.target.value;
+        };
+    }
 
-    // Auto reconnect jika sudah pernah login
     if (window.ethereum) {
-        window.ethereum.request({ method: 'eth_accounts' }).then(accounts => {
-            if (accounts.length > 0) connectWallet();
+        window.ethereum.request({ method: 'eth_accounts' }).then(acc => {
+            if (acc.length > 0) connectWallet();
         });
         
         window.ethereum.on("accountsChanged", () => location.reload());
