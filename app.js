@@ -1,22 +1,17 @@
 /**
- * BOZZDEX V2.6 - VALIDATED FROM EXPLORER
- * Source: testnet.iopn.tech
+ * BOZZDEX V3.0 - STABLE PRODUCTION
+ * All Fixed: Network, Decimal, and Brackets.
  */
 
-// ===============================
-// DATA RESMI (VALIDATED)
-// ===============================
 const CONFIG = {
     CHAIN_ID: "0x3d8", // 984
     CHAIN_NAME: "OPN Testnet",
     RPC_URL: "https://testnet-rpc2.iopn.tech",
     EXPLORER: "https://testnet.iopn.tech",
     SYMBOL: "OPN",
-    
-    // ALAMAT KONTRAK (VERIFIED FROM EXPLORER)
     ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
-    T_IN: "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84",   // Wrapped OPN (WOPN)
-    T_OUT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d"  // OPN Testnet (OPNT)
+    T_IN: "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84",
+    T_OUT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d"
 };
 
 const ABIS = {
@@ -32,9 +27,6 @@ const ABIS = {
 let provider, signer, userAddress;
 let decimalsIn = 18;
 
-// ===============================
-// LOGGER
-// ===============================
 function log(msg, err = false) {
     const el = document.getElementById("statusLog");
     if (el) {
@@ -43,9 +35,6 @@ function log(msg, err = false) {
     }
 }
 
-// ===============================
-// NETWORK GUARD
-// ===============================
 async function switchNetwork() {
     try {
         await window.ethereum.request({
@@ -68,56 +57,35 @@ async function switchNetwork() {
     }
 }
 
-// ===============================
-// WALLET CORE
-// ===============================
 async function connectWallet() {
-    if (!window.ethereum) return alert("Gunakan Metamask / OKX Wallet!");
-
+    if (!window.ethereum) return alert("Buka di MetaMask!");
     try {
-        log("Sinkronisasi Jaringan...");
+        log("Sinkronisasi Network...");
         await switchNetwork();
-
         const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
         userAddress = accounts[0];
-
+        
         provider = new ethers.BrowserProvider(window.ethereum);
-        await provider.getNetwork();
         signer = await provider.getSigner();
 
-        // UI SYNC
-        const btn = document.getElementById("btnConnect");
-        if (btn) btn.innerText = userAddress.slice(0,6)+"..."+userAddress.slice(-4);
-        
-        const badge = document.getElementById("networkBadge");
-        if (badge) {
-            badge.innerText = "OPN ONLINE";
-            badge.style.background = "#238636";
-        }
-
+        document.getElementById("btnConnect").innerText = userAddress.slice(0,6)+"..."+userAddress.slice(-4);
+        document.getElementById("networkBadge").innerText = "OPN ONLINE";
         document.getElementById("btnSwap").disabled = false;
 
-        log("Terhubung ke OPN Testnet ✅");
+        log("Siap Swap, Bray! ✅");
         await updateBalances();
-
     } catch (err) {
-        log("Gagal konek: " + err.message.slice(0,20), true);
+        log("Koneksi Batal/Gagal ❌", true);
+        console.error(err);
     }
 }
 
-// ===============================
-// BALANCE ENGINE (OPTIMIZED)
-// ===============================
 async function updateBalances() {
     if (!userAddress || !provider) return;
-    
     try {
-        // Pastikan kita pakai provider terbaru
-        const currentProvider = new ethers.BrowserProvider(window.ethereum);
-        const cIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, currentProvider);
-        const cOut = new ethers.Contract(CONFIG.T_OUT, ABIS.ERC20, currentProvider);
+        const cIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, provider);
+        const cOut = new ethers.Contract(CONFIG.T_OUT, ABIS.ERC20, provider);
 
-        // Ambil data secara paralel
         const [b1, d1, b2, d2] = await Promise.all([
             cIn.balanceOf(userAddress),
             cIn.decimals(),
@@ -126,95 +94,70 @@ async function updateBalances() {
         ]);
 
         decimalsIn = Number(d1);
+        
+        // Formatting saldo: paksa pake titik dan rapih 4 desimal
+        const f1 = parseFloat(ethers.formatUnits(b1, d1)).toFixed(4);
+        const f2 = parseFloat(ethers.formatUnits(b2, d2)).toFixed(4);
 
-        // Formatting saldo dengan presisi 4 angka di belakang titik
-        const formatBal = (val, dec) => {
-            const formatted = ethers.formatUnits(val, dec);
-            return parseFloat(formatted).toFixed(4); 
-        };
-
-        // Update UI - Paksa ganti koma jadi titik jika ada
-        const balInVal = formatBal(b1, d1).replace(',', '.');
-        const balOutVal = formatBal(b2, d2).replace(',', '.');
-
-        document.getElementById("balIn").innerText = "Saldo: " + balInVal;
-        document.getElementById("balOut").innerText = "Saldo: " + balOutVal;
-
-        console.log("Balance Sync Success:", { balInVal, balOutVal });
-    } catch (e) { 
-        console.error("Balance Error:", e);
-        // Retry sekali lagi setelah 2 detik kalau gagal
-        setTimeout(updateBalances, 2000);
+        document.getElementById("balIn").innerText = "Saldo: " + f1.replace(',', '.');
+        document.getElementById("balOut").innerText = "Saldo: " + f2.replace(',', '.');
+    } catch (e) {
+        console.log("Gagal tarik saldo");
     }
 }
 
-// ===============================
-// INPUT SYNC (ANTI-KOMA)
-// ===============================
-// Cari bagian DOMContentLoaded lo, dan ganti input oninput-nya:
-input.oninput = (e) => {
-    // Ambil value, ganti koma ke titik secara real-time
-    let val = e.target.value.replace(',', '.');
-    e.target.value = val; // Set balik ke input agar tetap titik
-    document.getElementById("outputAmount").value = val;
-};
-
-// ===============================
-// SWAP ENGINE
-// ===============================
 async function executeSwap() {
     const val = document.getElementById("inputAmount").value;
     if (!val || val <= 0) return log("Input Kosong!", true);
 
     try {
-        log("Menyiapkan Transaksi...");
+        log("Validasi Swap...");
         const amt = ethers.parseUnits(val.toString(), decimalsIn);
         const tIn = new ethers.Contract(CONFIG.T_IN, ABIS.ERC20, signer);
         const dex = new ethers.Contract(CONFIG.ROUTER, ABIS.ROUTER, signer);
 
-        log("Mengecek Izin (Allowance)...");
+        log("Cek Approval...");
         const allowance = await tIn.allowance(userAddress, CONFIG.ROUTER);
-        
         if (allowance < amt) {
-            log("Meminta Persetujuan Token...");
+            log("Approve Token...");
             const txA = await tIn.approve(CONFIG.ROUTER, ethers.MaxUint256);
             await txA.wait();
         }
 
-        log("Melakukan Swap...");
+        log("Kirim Transaksi...");
         const txS = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amt, 0);
         log("Menunggu Konfirmasi...");
         await txS.wait();
-
-        log("Swap Berhasil! 🔥");
+        
+        log("Swap Berhasil! 🔥🚀");
         await updateBalances();
     } catch (e) {
-        log("Transaksi Gagal ❌", true);
+        log("Transaksi Gagal!", true);
     }
 }
 
 // ===============================
-// INITIALIZER
+// INITIALIZER (SECURELY CLOSED)
 // ===============================
 document.addEventListener("DOMContentLoaded", () => {
-    const btn = document.getElementById("btnConnect");
-    const swap = document.getElementById("btnSwap");
-    const input = document.getElementById("inputAmount");
+    const btnC = document.getElementById("btnConnect");
+    const btnS = document.getElementById("btnSwap");
+    const inputA = document.getElementById("inputAmount");
 
-    if (btn) btn.onclick = connectWallet;
-    if (swap) swap.onclick = executeSwap;
-    if (input) {
-        input.oninput = (e) => {
-            document.getElementById("outputAmount").value = e.target.value;
+    if (btnC) btnC.onclick = connectWallet;
+    if (btnS) btnS.onclick = executeSwap;
+    
+    if (inputA) {
+        inputA.oninput = (e) => {
+            let cleanVal = e.target.value.replace(',', '.');
+            e.target.value = cleanVal;
+            const out = document.getElementById("outputAmount");
+            if (out) out.value = cleanVal;
         };
     }
 
     if (window.ethereum) {
-        window.ethereum.request({ method: 'eth_accounts' }).then(acc => {
-            if (acc.length > 0) connectWallet();
-        });
-        
-        window.ethereum.on("accountsChanged", () => location.reload());
-        window.ethereum.on("chainChanged", () => location.reload());
+        window.ethereum.request({ method: 'eth_accounts' })
+            .then(acc => { if (acc.length > 0) connectWallet(); });
     }
 });
