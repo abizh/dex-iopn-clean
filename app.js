@@ -121,6 +121,43 @@ async function updateBalances() {
 }
 
 // ===============================
+// 🔄 EXECUTE SWAP
+// ===============================
+async function executeSwap() {
+    const val = document.getElementById("inputAmount").value;
+    if (!val || val <= 0) {
+        log("Input jumlah dulu, bray!", true);
+        return;
+    }
+
+    try {
+        log("Memproses Swap...");
+        
+        // ABI Router (Minimal)
+        const routerAbi = ["function swap(address,address,uint256,uint256) external"];
+        const routerAddr = "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961"; // Alamat Router OPN
+        
+        const dex = new ethers.Contract(routerAddr, routerAbi, signer);
+        
+        // Ambil desimal dulu (atau paksa 18 kalau yakin)
+        const amt = ethers.parseUnits(val, 18); 
+
+        log("Konfirmasi di MetaMask...");
+        const tx = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amt, 0);
+        
+        log("Tunggu blokir...");
+        await tx.wait();
+        
+        log("Swap Berhasil! 🔥🚀");
+        await updateBalances();
+
+    } catch (err) {
+        log("Swap Gagal / Dibatalkan ❌");
+        console.error(err);
+    }
+}
+
+// ===============================
 // 🔄 INPUT SYNC
 // ===============================
 function setupInput() {
@@ -147,5 +184,10 @@ function setupInput() {
 // ===============================
 document.addEventListener("DOMContentLoaded", () => {
     setupInput();
+    
+    // Hubungkan tombol ke fungsi
     document.getElementById("btnConnect").onclick = connect;
+    document.getElementById("btnSwap").onclick = executeSwap; // <--- INI JANGAN SAMPE KETINGGALAN!
+    
+    log("Aplikasi Siap.");
 });
