@@ -1,56 +1,151 @@
+// ===============================
+// ⚙️ CONFIG
+// ===============================
 const CONFIG = {
     RPC: "https://testnet-rpc2.iopn.tech",
+    CHAIN_ID: "0x3d8", // 984
     T_IN: "0xBc022C9dEb5AF250A526321D16Ef52E39b4DBD84",
     T_OUT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d"
 };
 
-const ABI = ["function balanceOf(address) view returns (uint256)", "function decimals() view returns (uint8)"];
-let provider, signer, userAddress;
+const ABI = [
+    "function balanceOf(address) view returns (uint256)",
+    "function decimals() view returns (uint8)"
+];
 
-async function updateBalances() {
-    if (!userAddress) return;
-    try {
-        const cIn = new ethers.Contract(CONFIG.T_IN, ABI, provider);
-        const cOut = new ethers.Contract(CONFIG.T_OUT, ABI, provider);
-        const [bIn, dIn, bOut, dOut] = await Promise.all([
-            cIn.balanceOf(userAddress), cIn.decimals(),
-            cOut.balanceOf(userAddress), cOut.decimals()
-        ]);
-        document.getElementById("balIn").innerText = "Saldo: " + Number(ethers.formatUnits(bIn, dIn)).toFixed(4);
-        document.getElementById("balOut").innerText = "Saldo: " + Number(ethers.formatUnits(bOut, dOut)).toFixed(4);
-    } catch (e) { console.error(e); }
+// ===============================
+// 🌐 PROVIDERS
+// ===============================
+let walletProvider; // dari wallet
+let rpcProvider;    // langsung ke RPC
+let signer, userAddress;
+
+// ===============================
+// 🧠 LOGGER
+// ===============================
+function log(msg) {
+    const el = document.getElementById("statusLog");
+    if (el) el.innerText = "> " + msg;
+    console.log("[BOZZDEX]", msg);
 }
 
+// ===============================
+// 🔗 CONNECT WALLET (FIX TOTAL)
+// ===============================
 async function connect() {
-    if (!window.ethereum) return alert("Gunakan MetaMask/OKX Browser!");
-    provider = new ethers.BrowserProvider(window.ethereum);
-    const acc = await provider.send("eth_requestAccounts", []);
-    userAddress = acc[0];
-    signer = await provider.getSigner();
-    document.getElementById("btnConnect").innerText = userAddress.slice(0,6)+"..."+userAddress.slice(-4);
-    document.getElementById("btnSwap").disabled = false;
-    updateBalances();
+    if (!window.ethereum) {
+        alert("Gunakan MetaMask / OKX Wallet!");
+        return;
+    }
+
+    try {
+        log("Menghubungkan wallet...");
+
+        // Request akun
+        const accounts = await window.ethereum.request({
+            method: "eth_requestAccounts"
+        });
+
+        userAddress = accounts[0];
+
+        // Wallet provider
+        walletProvider = new ethers.BrowserProvider(window.ethereum);
+        signer = await walletProvider.getSigner();
+
+        // RPC provider (INDEPENDENT)
+        rpcProvider = new ethers.JsonRpcProvider(CONFIG.RPC);
+
+        // VALIDASI CHAIN
+        const chainId = await window.ethereum.request({ method: "eth_chainId" });
+
+        if (chainId !== CONFIG.CHAIN_ID) {
+            log("Switch ke iOPN...");
+            await window.ethereum.request({
+                method: "wallet_switchEthereumChain",
+                params: [{ chainId: CONFIG.CHAIN_ID }]
+            });
+        }
+
+        // UI update
+        document.getElementById("btnConnect").innerText =
+            userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
+
+        document.getElementById("btnSwap").disabled = false;
+
+        log("Wallet connected ✅");
+
+        // LOAD BALANCE
+        await updateBalances();
+
+        // AUTO REFRESH
+        setInterval(updateBalances, 10000);
+
+    } catch (err) {
+        log("Koneksi gagal ❌");
+        console.error(err);
+    }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+// ===============================
+// 💰 UPDATE BALANCE (FIX UTAMA)
+// ===============================
+async function updateBalances() {
+    if (!userAddress || !rpcProvider) return;
+
+    try {
+        const cIn = new ethers.Contract(CONFIG.T_IN, ABI, rpcProvider);
+        const cOut = new ethers.Contract(CONFIG.T_OUT, ABI, rpcProvider);
+
+        const [bIn, dIn, bOut, dOut] = await Promise.all([
+            cIn.balanceOf(userAddress),
+            cIn.decimals(),
+            cOut.balanceOf(userAddress),
+            cOut.decimals()
+        ]);
+
+        const balIn = ethers.formatUnits(bIn, dIn);
+        const balOut = ethers.formatUnits(bOut, dOut);
+
+        document.getElementById("balIn").innerText =
+            "Saldo: " + parseFloat(balIn).toFixed(4);
+
+        document.getElementById("balOut").innerText =
+            "Saldo: " + parseFloat(balOut).toFixed(4);
+
+        log("Balance updated ✅");
+
+    } catch (err) {
+        log("Gagal ambil saldo ❌");
+        console.error(err);
+    }
+}
+
+// ===============================
+// 🔄 INPUT SYNC
+// ===============================
+function setupInput() {
     const input = document.getElementById("inputAmount");
     const output = document.getElementById("outputAmount");
 
     input.oninput = (e) => {
-        let el = e.target;
-        let start = el.selectionStart; // Simpan posisi kursor
-        
-        // Aturan: Ganti koma ke titik, hapus selain angka & satu titik
-        let val = el.value.replace(',', '.').replace(/[^0-9.]/g, '');
-        const parts = val.split('.');
-        if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+        let val = e.target.value
+            .replace(",", ".")
+            .replace(/[^0-9.]/g, "");
 
-        if (el.value !== val) {
-            el.value = val;
-            el.setSelectionRange(start, start); // Paksa kursor balik ke posisi awal
+        const parts = val.split(".");
+        if (parts.length > 2) {
+            val = parts[0] + "." + parts.slice(1).join("");
         }
+
+        input.value = val;
         output.value = val;
     };
+}
 
+// ===============================
+// 🎬 INIT
+// ===============================
+document.addEventListener("DOMContentLoaded", () => {
+    setupInput();
     document.getElementById("btnConnect").onclick = connect;
 });
