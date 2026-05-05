@@ -3,198 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOZZDEX V2.1 | Master Logic</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <title>BOZZDEX | Stable V2.4</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.12.1/ethers.umd.min.js"></script>
     <style>
         :root {
-            --bg-dark: #0d1117;
-            --card-bg: #161b22;
-            --border-color: #30363d;
-            --text-main: #c9d1d9;
-            --text-dim: #8b949e;
-            --accent: #58a6ff;
-            --success: #238636;
+            --bg: #0d1117; --card: #161b22; --border: #30363d;
+            --text: #c9d1d9; --dim: #8b949e; --accent: #58a6ff;
         }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 15px;
+            background: var(--bg); color: var(--text);
+            font-family: sans-serif; display: flex; justify-content: center;
+            align-items: center; min-height: 100vh; margin: 0;
         }
-
         .dex-card {
-            background-color: var(--card-bg);
-            width: 100%;
-            max-width: 400px;
-            border-radius: 20px;
-            border: 1px solid var(--border-color);
-            padding: 24px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background: var(--card); border: 1px solid var(--border);
+            padding: 24px; border-radius: 20px; width: 100%; max-width: 380px;
         }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-        }
-
-        .logo {
-            font-size: 20px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-        }
-
-        .logo span { color: var(--accent); }
-
-        #networkBadge {
-            font-size: 11px;
-            background: #30363d;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-weight: 600;
-        }
-
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        #networkBadge { font-size: 11px; padding: 4px 10px; border-radius: 10px; background: #30363d; }
         .btn-connect {
-            width: 100%;
-            background: #21262d;
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-            padding: 12px;
-            border-radius: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-bottom: 20px;
-            transition: all 0.2s;
+            width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border);
+            background: #21262d; color: #fff; cursor: pointer; font-weight: bold;
         }
-
-        .btn-connect:hover { background: #30363d; }
-
-        .input-group {
-            background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 15px;
-            margin-bottom: 10px;
-        }
-
-        .input-group label {
-            display: block;
-            font-size: 12px;
-            color: var(--text-dim);
-            margin-bottom: 8px;
-        }
-
-        .input-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .input-row input {
-            background: transparent;
-            border: none;
-            color: #fff;
-            font-size: 22px;
-            font-weight: 600;
-            width: 60%;
-            outline: none;
-        }
-
-        .token-name { font-weight: 700; color: var(--accent); }
-
-        .balance-info {
-            font-size: 11px;
-            color: var(--text-dim);
-            margin-top: 8px;
-            display: block;
-        }
-
-        .divider {
-            text-align: center;
-            margin: -5px 0 5px;
-            font-size: 18px;
-            color: var(--border-color);
-        }
-
+        .input-box { background: var(--bg); padding: 15px; border-radius: 15px; border: 1px solid var(--border); margin: 10px 0; }
+        .input-box input { background: transparent; border: none; color: #fff; font-size: 20px; width: 100%; outline: none; }
         .btn-swap {
-            width: 100%;
-            background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
-            color: white;
-            border: none;
-            padding: 16px;
-            border-radius: 16px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            margin-top: 15px;
-            box-shadow: 0 4px 15px rgba(35, 134, 54, 0.3);
+            width: 100%; padding: 16px; border-radius: 12px; border: none;
+            background: #238636; color: #fff; font-weight: bold; cursor: pointer; margin-top: 10px;
         }
-
-        .btn-swap:disabled {
-            background: #21262d;
-            color: #484f58;
-            cursor: not-allowed;
-            box-shadow: none;
-        }
-
-        .status-box {
-            margin-top: 20px;
-            background: #010409;
-            border-radius: 10px;
-            padding: 10px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 11px;
-            border-left: 3px solid var(--accent);
-        }
-
-        #statusLog { color: #7ee787; }
+        .btn-swap:disabled { background: #21262d; color: #484f58; }
+        .status-box { margin-top: 15px; font-size: 11px; color: #7ee787; font-family: monospace; }
     </style>
 </head>
 <body>
-
-<div class="dex-card">
-    <div class="header">
-        <div class="logo">BOZZ<span>DEX</span></div>
-        <div id="networkBadge">Offline</div>
-    </div>
-
-    <button id="btnConnect" class="btn-connect" onclick="connectWallet()">Hubungkan Dompet</button>
-
-    <div class="input-group">
-        <label>Anda Jual</label>
-        <div class="input-row">
-            <input type="number" id="inputAmount" placeholder="0.0" step="any">
-            <span class="token-name">T-A</span>
+    <div class="dex-card">
+        <div class="header">
+            <div style="font-weight:bold">BOZZ<span>DEX</span></div>
+            <div id="networkBadge">Offline</div>
         </div>
-        <span id="balIn" class="balance-info">Saldo: 0.00</span>
-    </div>
+        
+        <button id="btnConnect" class="btn-connect">Hubungkan Dompet</button>
 
-    <div class="divider">↓</div>
-
-    <div class="input-group">
-        <label>Anda Terima (Estimasi)</label>
-        <div class="input-row">
-            <input type="number" id="outputAmount" placeholder="0.0" readonly>
-            <span class="token-name">T-B</span>
+        <div class="input-box">
+            <label style="font-size:10px; color:gray">JUAL T-A</label>
+            <input type="number" id="inputAmount" placeholder="0.0">
+            <div id="balIn" style="font-size:10px">Saldo: 0.0</div>
         </div>
-        <span id="balOut" class="balance-info">Saldo: 0.00</span>
+
+        <div style="text-align:center">↓</div>
+
+        <div class="input-box">
+            <label style="font-size:10px; color:gray">TERIMA T-B</label>
+            <input type="number" id="outputAmount" readonly placeholder="0.0">
+            <div id="balOut" style="font-size:10px">Saldo: 0.0</div>
+        </div>
+
+        <button id="btnSwap" class="btn-swap" disabled>SWAP SEKARANG</button>
+        <div class="status-box" id="statusLog">> Siap beraksi bray...</div>
     </div>
-
-    <button id="btnSwap" class="btn-swap" onclick="executeSwap()" disabled>MULAI PERDAGANGAN</button>
-
-    <div class="status-box">
-        <div id="statusLog">Siap beraksi, bray...</div>
-    </div>
-</div>
-
-<script src="app.js"></script>
-
+    <script src="app.js"></script>
 </body>
 </html>
