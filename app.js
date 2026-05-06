@@ -10,7 +10,13 @@ const CONFIG = {
     BOZZ_ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961"
 };
 
-const ABI_TOKEN = ["function balanceOf(address) view returns (uint256)","function allowance(address,address) view returns (uint256)","function approve(address,uint256) external returns (bool)"];
+const ABI_TOKEN = [
+    "function balanceOf(address) view returns (uint256)",
+    "function allowance(address,address) view returns (uint256)",
+    "function approve(address,uint256) external returns (bool)",
+    "function totalSupply() view returns (uint256)" // Tambahin ini buat jaga-jaga
+];
+
 const ABI_ROUTER = [
     "function swap(address,address,uint256,uint256) external",
     "function addLiquidity(address tA, address tB, uint256 amtA, uint256 amtB) external",
@@ -160,66 +166,65 @@ async function executeAddLiquidity() {
     } catch (err) { log("Add Liq Error", true); }
 }
 
-// Kita pastiin nempel ke window biar tombol di HTML bisa manggil dengan lancar
-window.executeRemoveLiquidity = async (percent) => {
+window.executeRemoveLiquidity = async function(percent) {
     try {
-        log("Removing... ⏳");
-        const tx = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer)).removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
-        await tx.wait();
-        saveTx(`Remove Liq ${percent==4?'100':percent*25}%`, tx.hash, "Success");
-        log("Liquidity Removed! 💸");
-        updateBalances();
-    } catch (err) { log("Remove Error", true); }
-}
+        log("Nengokin kolam... 🔍");
+        
+        // Pastikan signer ready
+        if (!signer) {
+            log("Koneksi dompet ilang, hubungin ulang bray!", true);
+            await connect();
+        }
 
-        log("Nengokin kolam ikan... 🔍");
         const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
         
-        // 1. Ambil alamat pool
+        // 1. Ambil alamat pool langsung
         const poolAddr = await dex.getPool(CONFIG.T_IN, CONFIG.T_OUT);
-        
-        if (!poolAddr || poolAddr === ethers.ZeroAddress) {
-            log("Kolam nggak ketemu! Add LP dulu.", true);
+        console.log("Alamat Kolam:", poolAddr);
+
+        if (poolAddr === ethers.ZeroAddress) {
+            log("Kolam kosong/belum ada!", true);
             return;
         }
 
-        // 2. Cek saldo LP
+        // 2. Koneksi ke LP Token
         const lpToken = new ethers.Contract(poolAddr, ABI_TOKEN, signer);
+        
+        // Cek saldo LP - Pakai BigInt langsung biar gak pusing
         const bal = await lpToken.balanceOf(userAddress);
+        console.log("Saldo LP:", bal.toString());
 
         if (bal === 0n) {
-            log("Saldo LP kosong, nggak ada ikan buat ditarik!", true);
+            log("Gak ada isi di kolam lu bray!", true);
             return;
         }
 
-        // 3. Hitung jatah yang mau di-approve
+        // 3. Mapping Persentase
         const p = Number(percent);
-        const map = { 1: 25n, 2: 50n, 3: 75n, 4: 100n };
-        const amt = (bal * map[p]) / 100n;
+        const mapPct = { 1: 25n, 2: 50n, 3: 75n, 4: 100n };
+        const amtToApprove = (bal * mapPct[p]) / 100n;
 
-        // 🛡️ STEP 1: APPROVE (Gaya Rabby - Wajib Izin)
-        log(`Minta izin tarik ${map[p]}% LP... 🛡️`);
-        const txA = await lpToken.approve(CONFIG.BOZZ_ROUTER, amt);
-        log("Nunggu tanda tangan izin... ⏳");
+        // 🛡️ STEP 1: APPROVE (Wajib Izin gaya Rabby)
+        log(`Minta izin tarik ${mapPct[p]}%... 🛡️`);
+        const txA = await lpToken.approve(CONFIG.BOZZ_ROUTER, amtToApprove);
         await txA.wait();
         log("Izin dikasih! ✅");
 
-        // 🚀 STEP 2: EKSEKUSI TARIK (REMOVE)
-        log("Lagi proses narik ikan dari kolam... ⏳");
+        // 🚀 STEP 2: EKSEKUSI REMOVE
+        log("Narik koin dari kolam... ⏳");
         const txR = await dex.removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, p, false);
-        log("Nunggu konfirmasi blok... ⏳");
         await txR.wait();
         
-        const label = map[p].toString() + '%';
-        saveTx(`Remove Liq ${label}`, txR.hash, "Success");
-        log(`Liquidity ${label} Berhasil Ditarik! 💸`);
+        saveTx(`Remove Liq ${mapPct[p]}%`, txR.hash, "Success");
+        log("Koin berhasil balik ke dompet! 💸");
         updateBalances();
 
     } catch (err) {
-        console.error("Error Detail:", err);
-        // Kalau user reject di Metamask
-        if (err.code === "ACTION_REJECTED") {
-            log("User nolak transaksi/izin. ❌", true);
+        console.error("DEBUG ERROR:", err);
+        // Cek error spesifik dari Metamask
+        const errorDetail = err.reason || err.message || "";
+        if (errorDetail.includes("rejected")) {
+            log("User nolak transaksi. ❌", true);
         } else {
             log("Aduhh.. ada yang nyangkut bray! ❌", true);
         }
