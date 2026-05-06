@@ -75,25 +75,47 @@ function setupInput() {
     const output = document.getElementById("outputAmount");
     input.oninput = async (e) => {
         let val = e.target.value.replace(",", ".");
-        if (!val || isNaN(val)) return;
+        if (!val || isNaN(val) || val <= 0) { output.value = ""; return; }
+
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(async () => {
-            const router = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, rpcProvider);
-            const poolAddr = await router.getPool(CONFIG.T_IN, CONFIG.T_OUT);
-            const pool = new ethers.Contract(poolAddr, ABI_POOL, rpcProvider);
-            
-            const [r0, r1, t0] = await Promise.all([pool.reserve0(), pool.reserve1(), pool.token0()]);
-            const [resIn, resOut] = CONFIG.T_IN === t0 ? [r0, r1] : [r1, r0];
-            
-            const amtIn = ethers.parseUnits(val, 18);
-            const amtInWithFee = (amtIn * 997n) / 1000n;
-            const amtOut = (amtInWithFee * resOut) / (resIn + amtInWithFee);
-            
-            output.value = ethers.formatUnits(amtOut, 18);
-            
-            // Calc Impact
-            const impact = ((Number(resOut)/Number(resIn) - Number(amtOut)/Number(val)) / (Number(resOut)/Number(resIn)) * 100).toFixed(2);
-            log(`Price Impact: ${impact}% ${impact > 5 ? '⚠️' : '✅'}`);
+            try {
+                const router = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, rpcProvider);
+                const poolAddr = await router.getPool(CONFIG.T_IN, CONFIG.T_OUT);
+                const pool = new ethers.Contract(poolAddr, ABI_POOL, rpcProvider);
+                
+                const [r0, r1, t0] = await Promise.all([pool.reserve0(), pool.reserve1(), pool.token0()]);
+                
+                // 1. Normalisasi Reserve ke Number (biar itungan persentase akurat)
+                const resIn = Number(ethers.formatUnits(CONFIG.T_IN === t0 ? r0 : r1, 18));
+                const resOut = Number(ethers.formatUnits(CONFIG.T_IN === t0 ? r1 : r0, 18));
+                
+                const amtIn = Number(val);
+                
+                // 2. Rumus AMM: (x * y) / (x + bin)
+                // Kita itung manual di JS buat simulasi harga
+                const amtInWithFee = amtIn * 0.997; // Potong fee 0.3%
+                const amtOut = (amtInWithFee * resOut) / (resIn + amtInWithFee);
+                
+                output.value = amtOut.toFixed(18);
+
+                // 3. HITUNG PRICE IMPACT YANG BENER
+                // Spot Price = reserveOut / reserveIn
+                // Execution Price = amtOut / amtIn
+                const spotPrice = resOut / resIn;
+                const executionPrice = amtOut / amtIn;
+                
+                const impact = ((spotPrice - executionPrice) / spotPrice) * 100;
+
+                // 4. Update UI Log
+                const logColor = impact > 5 ? "color: #da3633;" : "color: #7ee787;";
+                const statusLog = document.getElementById("statusLog");
+                statusLog.innerHTML = `Price Impact: <span style="${logColor}">${impact.toFixed(2)}%</span> ${impact > 5 ? '⚠️' : '✅'}`;
+
+            } catch (err) {
+                console.error("Price Calc Error:", err);
+                output.value = "Error";
+            }
         }, 400);
     };
 }
