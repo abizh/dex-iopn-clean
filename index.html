@@ -33,6 +33,12 @@
         .btn-opt:hover { background: var(--border); }
         
         #statusLog { font-size: 10px; margin-top: 15px; color: #7ee787; min-height: 12px; text-align: center; }
+        
+        /* History Style ala CEX */
+        #txList { display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto; margin-top: 10px; }
+        #txList::-webkit-scrollbar { width: 4px; }
+        #txList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+        
         .hidden { display: none; }
     </style>
 </head>
@@ -84,24 +90,29 @@
                     <button class="btn-opt" onclick="executeRemoveLiquidity(3)">75%</button>
                     <button class="btn-opt" onclick="executeRemoveLiquidity(4)">100%</button>
                 </div>
-                <p style="font-size: 10px; color: #8b949e; text-align: center; margin-top: 20px; line-height: 1.4;">
-                    Menarik likuiditas akan mengembalikan token WOPN dan OPNT ke dompet Anda berdasarkan share pool.
-                </p>
             </div>
         </div>
 
         <div id="marketPrice" style="font-size:12px; color:var(--blue); margin-top:15px; border-top: 1px solid var(--border); padding-top: 10px;"></div>
         <div id="statusLog"></div>
+
+        <div id="history-section" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;">
+            <div class="label-row">
+                <span style="font-weight: bold; color: var(--text);">Recent History</span>
+                <span id="btnClearHistory" onclick="clearHistory()" style="cursor: pointer; color: var(--red);">Clear</span>
+            </div>
+            <div id="txList">
+                <div style="text-align: center; font-size: 10px; color: #484f58; padding: 10px;">No history found</div>
+            </div>
+        </div>
     </div>
 
     <script>
-        // Navigasi Tab Utama
         function switchMainTab(tab) {
             const swapSec = document.getElementById('swap-section');
             const liqSec = document.getElementById('liq-section');
             const tabSwap = document.getElementById('tabSwap');
             const tabLiq = document.getElementById('tabLiq');
-
             if (tab === 'swap') {
                 swapSec.classList.remove('hidden');
                 liqSec.classList.add('hidden');
@@ -115,13 +126,11 @@
             }
         }
 
-        // Navigasi Sub-Tab (Khusus di dalam Liquidity)
         function switchSubTab(sub) {
             const addContent = document.getElementById('add-liq-content');
             const removeContent = document.getElementById('remove-liq-content');
             const subTabAdd = document.getElementById('subTabAdd');
             const subTabRemove = document.getElementById('subTabRemove');
-
             if (sub === 'add') {
                 addContent.classList.remove('hidden');
                 removeContent.classList.add('hidden');
@@ -137,5 +146,4 @@
     </script>
     <script src="app.js"></script>
 </body>
-                </html>
-                
+</html>
