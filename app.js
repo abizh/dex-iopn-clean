@@ -166,67 +166,16 @@ async function executeAddLiquidity() {
     } catch (err) { log("Add Liq Error", true); }
 }
 
-window.executeRemoveLiquidity = async function(percent) {
-    // Kita bungkus semua dalam satu blok biar gak banyak interaksi bolak-balik
+window.executeRemoveLiquidity = async (percent) => {
     try {
-        log("Nengokin kolam... 🔍");
-        
-        // Pake try-catch kecil buat handle timeout di eth_call
-        let poolAddr;
-        try {
-            const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
-            poolAddr = await dex.getPool(CONFIG.T_IN, CONFIG.T_OUT);
-        } catch (e) {
-            log("Gagal konek ke Pool (Timeout RPC). Coba lagi!", true);
-            return;
-        }
-
-        if (!poolAddr || poolAddr === ethers.ZeroAddress) {
-            log("Kolam belum ada bray!", true);
-            return;
-        }
-
-        const lpToken = new ethers.Contract(poolAddr, ABI_TOKEN, signer);
-        const bal = await lpToken.balanceOf(userAddress);
-
-        if (bal === 0n) {
-            log("Gak ada LP buat ditarik bray!", true);
-            return;
-        }
-
-        const p = Number(percent);
-        const mapPct = { 1: 25n, 2: 50n, 3: 75n, 4: 100n };
-        const amtToApprove = (bal * mapPct[p]) / 100n;
-
-        // 🛡️ STEP 1: APPROVE
-        log(`Izin tarik ${mapPct[p]}% LP... 🛡️`);
-        const txA = await lpToken.approve(CONFIG.BOZZ_ROUTER, amtToApprove);
-        await txA.wait();
-        
-        // PENTING: Jangan pake setTimeout(string), Mises benci itu!
-        // Kita pake delay murni biar gak kena blokir CSP
-        log("Izin OK! Menunggu sinkronisasi... ✅");
-        await new Promise(resolve => resolve(true)); // Dummy delay yang aman dari CSP
-
-        // 🚀 STEP 2: EKSEKUSI REMOVE
-        log("Proses narik koin... ⏳");
-        const txR = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer))
-                        .removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, p, false);
-        await txR.wait();
-        
-        saveTx(`Remove Liq ${mapPct[p]}%`, txR.hash, "Success");
-        log("Sukses! Koin balik ke dompet. 💸");
+        log("Removing... ⏳");
+        const tx = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer)).removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
+        await tx.wait();
+        saveTx(`Remove Liq ${percent==4?'100':percent*25}%`, tx.hash, "Success");
+        log("Liquidity Removed! 💸");
         updateBalances();
-
-    } catch (err) {
-        console.error("DETAIL ERROR:", err);
-        // Tangani pesan error spesifik dari Mises/Metamask
-        const msg = err.message || "";
-        if (msg.includes("timeout")) log("Koneksi timeout, coba sekali lagi bray!", true);
-        else if (msg.includes("rejected")) log("User nolak transaksi. ❌", true);
-        else log("Aduhh.. ada yang nyangkut bray! ❌", true);
-    }
-};
+    } catch (err) { log("Remove Error", true); }
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     setupInput();
