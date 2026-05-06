@@ -6,33 +6,87 @@
     <title>BOZZDEX V3.5 FINAL</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.12.1/ethers.umd.min.js"></script>
     <style>
-        :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #c9d1d9; --accent: #238636; }
+        :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #c9d1d9; --accent: #238636; --blue: #58a6ff; }
         body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .dex-card { background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 16px; width: 90%; max-width: 360px; }
-        .input-box { background: var(--bg); padding: 12px; border-radius: 12px; border: 1px solid var(--border); margin: 10px 0; }
+        .dex-card { background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 16px; width: 90%; max-width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+        
+        /* Tab Navigation */
+        .tabs { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .tab-btn { background: none; border: none; color: #8b949e; cursor: pointer; font-weight: bold; font-size: 14px; padding: 5px 10px; }
+        .tab-btn.active { color: var(--blue); border-bottom: 2px solid var(--blue); }
+
+        .input-box { background: var(--bg); padding: 12px; border-radius: 12px; border: 1px solid var(--border); margin: 8px 0; }
         .input-box input { background: transparent; border: none; color: #fff; font-size: 18px; width: 100%; outline: none; }
-        .btn-connect { width: 100%; padding: 10px; border-radius: 10px; background: #21262d; color: #fff; border: 1px solid var(--border); cursor: pointer; margin-bottom: 10px; }
-        .btn-swap { width: 100%; padding: 14px; border-radius: 10px; background: var(--accent); color: #fff; border: none; font-weight: bold; cursor: pointer; }
-        .btn-swap:disabled { background: #21262d; color: #484f58; }
+        
+        .btn-connect { width: 100%; padding: 10px; border-radius: 10px; background: #21262d; color: #fff; border: 1px solid var(--border); cursor: pointer; margin-bottom: 10px; font-size: 12px; }
+        .btn-action { width: 100%; padding: 14px; border-radius: 10px; background: var(--accent); color: #fff; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-action:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+        
         .label-row { display: flex; justify-content: space-between; font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+        #statusLog { font-size: 10px; margin-top: 10px; color: #7ee787; min-height: 12px; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
     <div class="dex-card">
         <button id="btnConnect" class="btn-connect">Hubungkan Dompet</button>
-        <div class="input-box">
-            <div class="label-row"><span>JUAL (WOPN)</span><span id="balIn">Saldo: 0.0</span></div>
-            <input type="text" id="inputAmount" inputmode="decimal" placeholder="0.0">
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('swap')">Swap</button>
+            <button class="tab-btn" onclick="switchTab('liquidity')">Liquidity</button>
         </div>
-        <div style="text-align:center; color:#58a6ff;">↓</div>
-        <div class="input-box">
-            <div class="label-row"><span>TERIMA (OPNT)</span><span id="balOut">Saldo: 0.0</span></div>
-            <input type="text" id="outputAmount" placeholder="0.0" readonly>
+
+        <div id="swap-section">
+            <div class="input-box">
+                <div class="label-row"><span>JUAL (WOPN)</span><span id="balIn">Saldo: 0.0</span></div>
+                <input type="text" id="inputAmount" inputmode="decimal" placeholder="0.0">
+            </div>
+            <div style="text-align:center; color:var(--blue); margin: -5px 0;">↓</div>
+            <div class="input-box">
+                <div class="label-row"><span>TERIMA (OPNT)</span><span id="balOut">Saldo: 0.0</span></div>
+                <input type="text" id="outputAmount" placeholder="0.0" readonly>
+            </div>
+            <button id="btnSwap" class="btn-action" disabled>SWAP SEKARANG</button>
         </div>
-        <button id="btnSwap" class="btn-swap" disabled>SWAP SEKARANG</button>
-        <div id="marketPrice" style="font-size:12px; color:#58a6ff;"></div>
-        <div id="statusLog" style="font-size:10px; margin-top:10px; color:#7ee787;"></div>
+
+        <div id="liq-section" class="hidden">
+            <div class="label-row" style="margin-bottom: 10px;"><span>Suntik Likuiditas (Pool WOPN/OPNT)</span></div>
+            <div class="input-box">
+                <div class="label-row"><span>WOPN Amount</span></div>
+                <input type="text" id="inputAmtA" inputmode="decimal" placeholder="0.0">
+            </div>
+            <div class="input-box">
+                <div class="label-row"><span>OPNT Amount</span></div>
+                <input type="text" id="inputAmtB" inputmode="decimal" placeholder="0.0">
+            </div>
+            <button id="btnLiquidity" class="btn-action" disabled>TAMBAH LIKUIDITAS</button>
+        </div>
+
+        <div id="marketPrice" style="font-size:12px; color:var(--blue); margin-top:15px; border-top: 1px solid var(--border); padding-top: 10px;"></div>
+        <div id="statusLog"></div>
     </div>
+
+    <script>
+        // Logic Tab Switch Sederhana
+        function switchTab(tab) {
+            const swapSec = document.getElementById('swap-section');
+            const liqSec = document.getElementById('liq-section');
+            const tabs = document.querySelectorAll('.tab-btn');
+
+            if (tab === 'swap') {
+                swapSec.classList.remove('hidden');
+                liqSec.classList.add('hidden');
+                tabs[0].classList.add('active');
+                tabs[1].classList.remove('active');
+            } else {
+                swapSec.classList.add('hidden');
+                liqSec.classList.remove('hidden');
+                tabs[0].classList.remove('active');
+                tabs[1].classList.add('active');
+            }
+        }
+    </script>
     <script src="app.js"></script>
 </body>
-</html>
+    </html>
+    
