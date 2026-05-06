@@ -1,5 +1,5 @@
 // ==========================================================
-// 🚀 BOZZDEX MEGA-MASTER CODE - V2.4 (ANTI-MELEDAK)
+// 🚀 BOZZDEX MEGA-MASTER CODE - V2.5 (CEX HISTORY EDITION)
 // ==========================================================
 
 const CONFIG = {
@@ -10,33 +10,24 @@ const CONFIG = {
     BOZZ_ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961"
 };
 
-const ABI_TOKEN = [
-    "function balanceOf(address) view returns (uint256)",
-    "function allowance(address,address) view returns (uint256)",
-    "function approve(address,uint256) external returns (bool)"
-];
-
+const ABI_TOKEN = ["function balanceOf(address) view returns (uint256)","function allowance(address,address) view returns (uint256)","function approve(address,uint256) external returns (bool)"];
 const ABI_ROUTER = [
     "function swap(address,address,uint256,uint256) external",
     "function addLiquidity(address tA, address tB, uint256 amtA, uint256 amtB) external",
     "function removeLiquidityMulti(address tA, address tB, uint8 percentChoice, bool toNative) external",
     "function getPool(address,address) view returns (address)"
 ];
+const ABI_POOL = ["function reserve0() view returns (uint112)","function reserve1() view returns (uint112)","function token0() view returns (address)"];
 
-const ABI_POOL = [
-    "function reserve0() view returns (uint112)",
-    "function reserve1() view returns (uint112)",
-    "function token0() view returns (address)"
-];
+let walletProvider, rpcProvider, signer, userAddress, debounceTimer;
 
-let walletProvider, rpcProvider, signer, userAddress;
-let debounceTimer;
-
+// --- UI LOGGERS ---
 function log(msg, isError = false) {
     const el = document.getElementById("statusLog");
     if (el) el.innerHTML = (isError ? "❌ " : "> ") + msg;
 }
 
+// --- CORE WALLET ---
 async function connect() {
     if (!window.ethereum) return alert("Install Wallet!");
     try {
@@ -46,8 +37,7 @@ async function connect() {
         walletProvider = new ethers.BrowserProvider(window.ethereum);
         signer = await walletProvider.getSigner();
         document.getElementById("btnConnect").innerText = userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
-        document.getElementById("btnSwap").disabled = false;
-        if(document.getElementById("btnLiquidity")) document.getElementById("btnLiquidity").disabled = false;
+        document.querySelectorAll(".btn-action").forEach(b => b.disabled = false);
         log("Connected ✅");
         updateBalances();
     } catch (err) { log("Conn Failed", true); }
@@ -62,57 +52,70 @@ async function updateBalances() {
     document.getElementById("balOut").innerText = "Saldo: " + ethers.formatUnits(bOut, 18);
 }
 
-// --- FIX PRICE IMPACT & INPUT SYNC ---
+// --- PRICE IMPACT LOGIC ---
 function setupInput() {
     const input = document.getElementById("inputAmount");
     const output = document.getElementById("outputAmount");
-    input.oninput = async (e) => {
+    input.oninput = (e) => {
         let val = e.target.value.replace(",", ".");
         if (!val || isNaN(val) || val <= 0) { output.value = ""; return; }
-
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(async () => {
             try {
                 const router = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, rpcProvider);
                 const poolAddr = await router.getPool(CONFIG.T_IN, CONFIG.T_OUT);
                 const pool = new ethers.Contract(poolAddr, ABI_POOL, rpcProvider);
-                
                 const [r0, r1, t0] = await Promise.all([pool.reserve0(), pool.reserve1(), pool.token0()]);
-                
-                // Normalisasi Reserve (Konversi BigInt ke Number biasa)
                 const resIn = Number(ethers.formatUnits(CONFIG.T_IN === t0 ? r0 : r1, 18));
                 const resOut = Number(ethers.formatUnits(CONFIG.T_IN === t0 ? r1 : r0, 18));
-                
                 const amtIn = Number(val);
-                const amtInWithFee = amtIn * 0.997; // Fee 0.3%
-                
-                // Rumus AMM: amtOut = (amtIn * resOut) / (resIn + amtIn)
-                const amtOut = (amtInWithFee * resOut) / (resIn + amtInWithFee);
+                const amtOut = (amtIn * 0.997 * resOut) / (resIn + (amtIn * 0.997));
                 output.value = amtOut.toFixed(18);
-
-                // Hitung Impact: ((SpotPrice - ExecutionPrice) / SpotPrice) * 100
-                const spotPrice = resOut / resIn;
-                const executionPrice = amtOut / amtIn;
-                const impact = ((spotPrice - executionPrice) / spotPrice) * 100;
-
+                const impact = (((resOut / resIn) - (amtOut / amtIn)) / (resOut / resIn) * 100);
                 const color = impact > 5 ? "#da3633" : "#7ee787";
                 log(`Price Impact: <span style="color:${color}; font-weight:bold;">${impact.toFixed(2)}%</span> ${impact > 5 ? '⚠️' : '✅'}`);
-            } catch (err) {
-                console.error(err);
-                output.value = "Error";
-            }
+            } catch (err) { output.value = "Error"; }
         }, 400);
     };
 }
 
-// --- TRANSACTIONS ---
+// --- TRANSACTION HISTORY ENGINE ---
+function saveTx(type, hash, status) {
+    let history = JSON.parse(localStorage.getItem("bozz_history") || "[]");
+    history.unshift({ type, hash, time: new Date().toLocaleTimeString(), status });
+    if (history.length > 10) history.pop();
+    localStorage.setItem("bozz_history", JSON.stringify(history));
+    renderHistory();
+}
+
+function renderHistory() {
+    const list = document.getElementById("txList");
+    let history = JSON.parse(localStorage.getItem("bozz_history") || "[]");
+    if (history.length === 0) return list.innerHTML = `<div style="text-align:center; font-size:10px; color:#484f58; padding:10px;">No history found</div>`;
+    list.innerHTML = history.map(tx => `
+        <div style="background:#0d1117; padding:8px; border-radius:8px; border:1px solid #30363d; font-size:10px; margin-bottom:5px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="font-weight:bold; color:${tx.status==='Success'?'#7ee787':'#da3633'}">${tx.type}</span>
+                <span style="color:#8b949e;">${tx.time}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+                <a href="https://testnet-explorer.iopn.tech/tx/${tx.hash}" target="_blank" style="color:#58a6ff; text-decoration:none;">${tx.hash.slice(0,10)}...${tx.hash.slice(-8)} ↗</a>
+                <span>${tx.status}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function clearHistory() { 
+    if(confirm("Hapus semua history?")) { localStorage.removeItem("bozz_history"); renderHistory(); }
+}
+
+// --- ACTIONS ---
 async function ensureApproval(token, amt) {
     const c = new ethers.Contract(token, ABI_TOKEN, signer);
-    const allowance = await c.allowance(userAddress, CONFIG.BOZZ_ROUTER);
-    if (allowance < amt) {
+    if (await c.allowance(userAddress, CONFIG.BOZZ_ROUTER) < amt) {
         log("Approving...");
-        const tx = await c.approve(CONFIG.BOZZ_ROUTER, ethers.MaxUint256);
-        await tx.wait();
+        await (await c.approve(CONFIG.BOZZ_ROUTER, ethers.MaxUint256)).wait();
     }
 }
 
@@ -126,9 +129,10 @@ async function executeSwap() {
         log("Swapping... ⏳");
         const tx = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amtIn, minOut);
         await tx.wait();
+        saveTx("Swap WOPN ➔ OPNT", tx.hash, "Success");
         log("Swap Success 🔥");
         updateBalances();
-    } catch (err) { log("Swap Error", true); }
+    } catch (err) { log("Swap Gagal", true); }
 }
 
 async function executeAddLiquidity() {
@@ -137,19 +141,21 @@ async function executeAddLiquidity() {
         const amtB = ethers.parseUnits(document.getElementById("inputAmtB").value, 18);
         await ensureApproval(CONFIG.T_IN, amtA);
         await ensureApproval(CONFIG.T_OUT, amtB);
-        log("Suntik Dana... ⏳");
+        log("Adding Liquidity... ⏳");
         const tx = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer)).addLiquidity(CONFIG.T_IN, CONFIG.T_OUT, amtA, amtB);
         await tx.wait();
+        saveTx("Add Liquidity", tx.hash, "Success");
         log("Liquidity Added! 💉");
         updateBalances();
     } catch (err) { log("Add Liq Error", true); }
 }
 
-async function executeRemoveLiquidity(percent) {
+window.executeRemoveLiquidity = async (percent) => {
     try {
         log("Removing... ⏳");
         const tx = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer)).removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
         await tx.wait();
+        saveTx(`Remove Liq ${percent==4?'100':percent*25}%`, tx.hash, "Success");
         log("Liquidity Removed! 💸");
         updateBalances();
     } catch (err) { log("Remove Error", true); }
@@ -157,8 +163,9 @@ async function executeRemoveLiquidity(percent) {
 
 document.addEventListener("DOMContentLoaded", () => {
     setupInput();
+    renderHistory();
     document.getElementById("btnConnect").onclick = connect;
     document.getElementById("btnSwap").onclick = executeSwap;
-    if(document.getElementById("btnLiquidity")) document.getElementById("btnLiquidity").onclick = executeAddLiquidity;
+    document.getElementById("btnLiquidity").onclick = executeAddLiquidity;
 });
         
