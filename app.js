@@ -160,53 +160,68 @@ async function executeAddLiquidity() {
     } catch (err) { log("Add Liq Error", true); }
 }
 
-window.executeRemoveLiquidity = async (percent) => {
+// Kita pastiin nempel ke window biar tombol di HTML bisa manggil dengan lancar
+window.executeRemoveLiquidity = async function(percent) {
     try {
-        // 1. Inisialisasi Kontrak
+        // Cek koneksi dulu, jangan-jangan si signer-nya lagi tidur
+        if (!signer || !userAddress) {
+            log("Hubungkan dompet dulu bray!", true);
+            await connect(); // Coba hubungin ulang otomatis
+        }
+
+        log("Nengokin kolam ikan... 🔍");
         const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
         
-        log("Mencari Alamat Pool... 🔍");
+        // 1. Ambil alamat pool
         const poolAddr = await dex.getPool(CONFIG.T_IN, CONFIG.T_OUT);
         
-        if (poolAddr === ethers.ZeroAddress) {
-            log("Pool Tidak Ditemukan!", true);
+        if (!poolAddr || poolAddr === ethers.ZeroAddress) {
+            log("Kolam nggak ketemu! Add LP dulu.", true);
             return;
         }
 
-        // 2. Cek Saldo LP User
+        // 2. Cek saldo LP
         const lpToken = new ethers.Contract(poolAddr, ABI_TOKEN, signer);
-        const userLpBalance = await lpToken.balanceOf(userAddress);
+        const bal = await lpToken.balanceOf(userAddress);
 
-        if (userLpBalance === 0n) {
-            log("Anda tidak punya saldo LP!", true);
+        if (bal === 0n) {
+            log("Saldo LP kosong, nggak ada ikan buat ditarik!", true);
             return;
         }
 
-        // 3. Hitung Persentase yang Mau Di-approve
-        // percent (1=25%, 2=50%, 3=75%, 4=100%)
-        const pctMap = { 1: 25n, 2: 50n, 3: 75n, 4: 100n };
-        const amtToApprove = (userLpBalance * pctMap[percent]) / 100n;
+        // 3. Hitung jatah yang mau di-approve
+        const p = Number(percent);
+        const map = { 1: 25n, 2: 50n, 3: 75n, 4: 100n };
+        const amt = (bal * map[p]) / 100n;
 
-        // 4. WAJIB APPROVE (Gaya Rabby)
-        log(`Approve ${pctMap[percent]}% LP Token... 🛡️`);
-        const txApprove = await lpToken.approve(CONFIG.BOZZ_ROUTER, amtToApprove);
-        await txApprove.wait();
-        log("Approve LP Sukses! ✅");
+        // 🛡️ STEP 1: APPROVE (Gaya Rabby - Wajib Izin)
+        log(`Minta izin tarik ${map[p]}% LP... 🛡️`);
+        const txA = await lpToken.approve(CONFIG.BOZZ_ROUTER, amt);
+        log("Nunggu tanda tangan izin... ⏳");
+        await txA.wait();
+        log("Izin dikasih! ✅");
 
-        // 5. EKSEKUSI REMOVE
-        log("Konfirmasi Penarikan... ⏳");
-        const tx = await dex.removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
-        await tx.wait();
+        // 🚀 STEP 2: EKSEKUSI TARIK (REMOVE)
+        log("Lagi proses narik ikan dari kolam... ⏳");
+        const txR = await dex.removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, p, false);
+        log("Nunggu konfirmasi blok... ⏳");
+        await txR.wait();
         
-        const label = percent === 4 ? '100%' : (percent * 25) + '%';
-        saveTx(`Remove Liq ${label}`, tx.hash, "Success");
+        const label = map[p].toString() + '%';
+        saveTx(`Remove Liq ${label}`, txR.hash, "Success");
         log(`Liquidity ${label} Berhasil Ditarik! 💸`);
         updateBalances();
-    } catch (err) { 
-        console.error(err);
-        log("Remove Dibatalkan/Error", true); 
+
+    } catch (err) {
+        console.error("Error Detail:", err);
+        // Kalau user reject di Metamask
+        if (err.code === "ACTION_REJECTED") {
+            log("User nolak transaksi/izin. ❌", true);
+        } else {
+            log("Aduhh.. ada yang nyangkut bray! ❌", true);
+        }
     }
-}
+};
 
 document.addEventListener("DOMContentLoaded", () => {
     setupInput();
