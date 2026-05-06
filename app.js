@@ -166,61 +166,33 @@ async function executeAddLiquidity() {
     } catch (err) { log("Add Liq Error", true); }
 }
 
-window.executeRemoveLiquidity = async (percent) => {
+async function executeRemoveLiquidity(percent) {
     try {
-        const LP_ADDR = "0x650dFfD3154Ec4cbE72127845aEBE4A93a0693a8";
-
-        const lp = new ethers.Contract(
-            LP_ADDR,
-            [
-                "function balanceOf(address) view returns(uint256)",
-                "function allowance(address,address) view returns(uint256)",
-                "function approve(address,uint256) returns(bool)"
-            ],
-            signer
-        );
-
-        const lpBalance = await lp.balanceOf(userAddress);
-
-        console.log("LP BALANCE:", lpBalance.toString());
-
-        if (lpBalance === 0n) {
-            log("LP kosong bro ❌", true);
-            return;
-        }
-
-        // 🔥 approve FULL (biar aman)
-        const allowance = await lp.allowance(userAddress, CONFIG.BOZZ_ROUTER);
-
-        if (allowance < lpBalance) {
-            log("Approve LP dulu...");
-            const txApprove = await lp.approve(CONFIG.BOZZ_ROUTER, ethers.MaxUint256);
+        const router = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, rpcProvider);
+        const poolAddr = await router.getPool(CONFIG.T_IN, CONFIG.T_OUT);
+        
+        // Kita butuh approve LP Token sebelum remove
+        log("Checking LP Approval... 🛡️");
+        const lpToken = new ethers.Contract(poolAddr, ABI_TOKEN, signer);
+        const allowance = await lpToken.allowance(userAddress, CONFIG.BOZZ_ROUTER);
+        
+        if (allowance === 0n) {
+            log("Approving LP Token... ⏳");
+            const txApprove = await lpToken.approve(CONFIG.BOZZ_ROUTER, ethers.MaxUint256);
             await txApprove.wait();
-            log("LP Approved ✅");
         }
 
         log("Removing Liquidity... ⏳");
-
         const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
-
-        const tx = await dex.removeLiquidityMulti(
-            CONFIG.T_IN,
-            CONFIG.T_OUT,
-            percent,
-            false
-        );
-
+        const tx = await dex.removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
         await tx.wait();
-
+        
+        saveTx(`Remove Liq ${percent==4?'100':percent*25}%`, tx.hash, "Success");
         log("Liquidity Removed! 💸");
-        await updateBalances();
-
-    } catch (err) {
-        console.error("REMOVE ERROR FULL:", err);
-        log("Remove Error ❌", true);
+        updateBalances();
+    } catch (err) { log("Remove Error", true); }
     }
-};
-
+        
 document.addEventListener("DOMContentLoaded", () => {
     setupInput();
     renderHistory();
