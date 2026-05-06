@@ -168,19 +168,36 @@ async function executeAddLiquidity() {
 
 window.executeRemoveLiquidity = async (percent) => {
     try {
+        const LP_ADDR = "0x650dFfD3154Ec4cbE72127845aEBE4A93a0693a8";
+
         const lp = new ethers.Contract(
-            "0x650dFfD3154Ec4cbE72127845aEBE4A93a0693a8",
-            ["function balanceOf(address) view returns(uint256)"],
-            rpcProvider
+            LP_ADDR,
+            [
+                "function balanceOf(address) view returns(uint256)",
+                "function allowance(address,address) view returns(uint256)",
+                "function approve(address,uint256) returns(bool)"
+            ],
+            signer
         );
 
         const lpBalance = await lp.balanceOf(userAddress);
 
-        // Hitung jumlah LP yg mau di-remove
-        const amount = lpBalance * BigInt(percent) / 4n;
+        console.log("LP BALANCE:", lpBalance.toString());
 
-        // 🔥 WAJIB: approve LP token dulu
-        await ensureLPApproval(amount);
+        if (lpBalance === 0n) {
+            log("LP kosong bro ❌", true);
+            return;
+        }
+
+        // 🔥 approve FULL (biar aman)
+        const allowance = await lp.allowance(userAddress, CONFIG.BOZZ_ROUTER);
+
+        if (allowance < lpBalance) {
+            log("Approve LP dulu...");
+            const txApprove = await lp.approve(CONFIG.BOZZ_ROUTER, ethers.MaxUint256);
+            await txApprove.wait();
+            log("LP Approved ✅");
+        }
 
         log("Removing Liquidity... ⏳");
 
@@ -195,14 +212,12 @@ window.executeRemoveLiquidity = async (percent) => {
 
         await tx.wait();
 
-        saveTx(`Remove ${percent * 25}%`, tx.hash, "Success");
-
         log("Liquidity Removed! 💸");
         await updateBalances();
 
     } catch (err) {
-        console.error(err);
-        log("Remove Error", true);
+        console.error("REMOVE ERROR FULL:", err);
+        log("Remove Error ❌", true);
     }
 };
 
