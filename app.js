@@ -161,13 +161,16 @@ async function executeAddLiquidity() {
 }
 
 // Kita pastiin nempel ke window biar tombol di HTML bisa manggil dengan lancar
-window.executeRemoveLiquidity = async function(percent) {
+window.executeRemoveLiquidity = async (percent) => {
     try {
-        // Cek koneksi dulu, jangan-jangan si signer-nya lagi tidur
-        if (!signer || !userAddress) {
-            log("Hubungkan dompet dulu bray!", true);
-            await connect(); // Coba hubungin ulang otomatis
-        }
+        log("Removing... ⏳");
+        const tx = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer)).removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
+        await tx.wait();
+        saveTx(`Remove Liq ${percent==4?'100':percent*25}%`, tx.hash, "Success");
+        log("Liquidity Removed! 💸");
+        updateBalances();
+    } catch (err) { log("Remove Error", true); }
+}
 
         log("Nengokin kolam ikan... 🔍");
         const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
