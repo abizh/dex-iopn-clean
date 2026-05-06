@@ -162,29 +162,50 @@ async function executeAddLiquidity() {
 
 window.executeRemoveLiquidity = async (percent) => {
     try {
-        const router = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, rpcProvider);
-        const poolAddr = await router.getPool(CONFIG.T_IN, CONFIG.T_OUT);
-        const lpToken = new ethers.Contract(poolAddr, ABI_TOKEN, signer);
+        // 1. Inisialisasi Kontrak
+        const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
         
-        // Cek dulu berapa jumlah LP yang dimiliki user
-        const userLpBalance = await lpToken.balanceOf(userAddress);
-        // Hitung jumlah yang mau di-approve berdasarkan %
-        const amtToApprove = (userLpBalance * BigInt(percent === 4 ? 100 : percent * 25)) / 100n;
+        log("Mencari Alamat Pool... 🔍");
+        const poolAddr = await dex.getPool(CONFIG.T_IN, CONFIG.T_OUT);
+        
+        if (poolAddr === ethers.ZeroAddress) {
+            log("Pool Tidak Ditemukan!", true);
+            return;
+        }
 
-        // 1. WAJIB APPROVE LP TOKEN
-        log("Approve LP Token... 🛡️");
+        // 2. Cek Saldo LP User
+        const lpToken = new ethers.Contract(poolAddr, ABI_TOKEN, signer);
+        const userLpBalance = await lpToken.balanceOf(userAddress);
+
+        if (userLpBalance === 0n) {
+            log("Anda tidak punya saldo LP!", true);
+            return;
+        }
+
+        // 3. Hitung Persentase yang Mau Di-approve
+        // percent (1=25%, 2=50%, 3=75%, 4=100%)
+        const pctMap = { 1: 25n, 2: 50n, 3: 75n, 4: 100n };
+        const amtToApprove = (userLpBalance * pctMap[percent]) / 100n;
+
+        // 4. WAJIB APPROVE (Gaya Rabby)
+        log(`Approve ${pctMap[percent]}% LP Token... 🛡️`);
         const txApprove = await lpToken.approve(CONFIG.BOZZ_ROUTER, amtToApprove);
         await txApprove.wait();
+        log("Approve LP Sukses! ✅");
 
-        // 2. EKSEKUSI REMOVE
-        log("Removing... ⏳");
-        const tx = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer)).removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
+        // 5. EKSEKUSI REMOVE
+        log("Konfirmasi Penarikan... ⏳");
+        const tx = await dex.removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
         await tx.wait();
         
-        saveTx(`Remove Liq ${percent==4?'100':percent*25}%`, tx.hash, "Success");
-        log("Liquidity Removed! 💸");
+        const label = percent === 4 ? '100%' : (percent * 25) + '%';
+        saveTx(`Remove Liq ${label}`, tx.hash, "Success");
+        log(`Liquidity ${label} Berhasil Ditarik! 💸`);
         updateBalances();
-    } catch (err) { log("Remove Dibatalkan", true); }
+    } catch (err) { 
+        console.error(err);
+        log("Remove Dibatalkan/Error", true); 
+    }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
