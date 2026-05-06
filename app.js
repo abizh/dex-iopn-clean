@@ -99,7 +99,7 @@ function renderHistory() {
                 <span style="color:#8b949e;">${tx.time}</span>
             </div>
             <div style="display:flex; justify-content:space-between;">
-                <a href="https://testnet-explorer.iopn.tech/tx/${tx.hash}" target="_blank" style="color:#58a6ff; text-decoration:none;">${tx.hash.slice(0,10)}...${tx.hash.slice(-8)} ↗</a>
+                <a href="https://testnet.iopn.tech/tx/${tx.hash}" target="_blank" style="color:#58a6ff; text-decoration:none;">${tx.hash.slice(0,10)}...${tx.hash.slice(-8)} ↗</a>
                 <span>${tx.status}</span>
             </div>
         </div>
