@@ -168,14 +168,43 @@ async function executeAddLiquidity() {
 
 window.executeRemoveLiquidity = async (percent) => {
     try {
-        log("Removing... ⏳");
-        const tx = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer)).removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
+        const lp = new ethers.Contract(
+            "0x650dFfD3154Ec4cbE72127845aEBE4A93a0693a8",
+            ["function balanceOf(address) view returns(uint256)"],
+            rpcProvider
+        );
+
+        const lpBalance = await lp.balanceOf(userAddress);
+
+        // Hitung jumlah LP yg mau di-remove
+        const amount = lpBalance * BigInt(percent) / 4n;
+
+        // 🔥 WAJIB: approve LP token dulu
+        await ensureLPApproval(amount);
+
+        log("Removing Liquidity... ⏳");
+
+        const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
+
+        const tx = await dex.removeLiquidityMulti(
+            CONFIG.T_IN,
+            CONFIG.T_OUT,
+            percent,
+            false
+        );
+
         await tx.wait();
-        saveTx(`Remove Liq ${percent==4?'100':percent*25}%`, tx.hash, "Success");
+
+        saveTx(`Remove ${percent * 25}%`, tx.hash, "Success");
+
         log("Liquidity Removed! 💸");
-        updateBalances();
-    } catch (err) { log("Remove Error", true); }
-}
+        await updateBalances();
+
+    } catch (err) {
+        console.error(err);
+        log("Remove Error", true);
+    }
+};
 
 document.addEventListener("DOMContentLoaded", () => {
     setupInput();
