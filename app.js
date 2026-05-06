@@ -110,6 +110,38 @@ async function updateBalances() {
             cOut.decimals()
         ]);
 
+        async function getOraclePrice() {
+    try {
+        const provider = new ethers.JsonRpcProvider(CONFIG.RPC);
+
+        const pair = new ethers.Contract(
+            "0x650dFfD3154Ec4cbE72127845aEBE4A93a0693a8", // pool resmi / referensi
+            ["function getReserves() view returns (uint112,uint112,uint32)"],
+            provider
+        );
+
+        const [r0, r1] = await pair.getReserves();
+
+        const reserveWOPN = Number(ethers.formatUnits(r0, 18));
+        const reserveOPNT = Number(ethers.formatUnits(r1, 18));
+
+        const price = reserveOPNT / reserveWOPN;
+
+        return price;
+
+    } catch (err) {
+        console.error("Oracle error:", err);
+        return 0;
+    }
+}
+        async function updateMarketUI() {
+    const price = await getOraclePrice();
+    if (!price) return;
+
+    document.getElementById("marketPrice").innerText =
+        "Market: 1 WOPN = " + price.toFixed(6) + " OPNT";
+        }
+        
         const balIn = ethers.formatUnits(bIn, dIn);
         const balOut = ethers.formatUnits(bOut, dOut);
 
