@@ -113,26 +113,36 @@ function clearHistory() {
 // --- ACTIONS ---
 async function ensureApproval(token, amt) {
     const c = new ethers.Contract(token, ABI_TOKEN, signer);
-    if (await c.allowance(userAddress, CONFIG.BOZZ_ROUTER) < amt) {
-        log("Approving...");
-        await (await c.approve(CONFIG.BOZZ_ROUTER, ethers.MaxUint256)).wait();
-    }
+    log("Meminta Izin (Approve)... 🛡️");
+    
+    // Kita minta izin SEJUMLAH amt yang akan ditransaksikan
+    // Ini lebih aman daripada MaxUint256
+    const tx = await c.approve(CONFIG.BOZZ_ROUTER, amt);
+    log("Menunggu Konfirmasi Approve... ⏳");
+    await tx.wait();
+    log("Izin Diberikan! ✅");
 }
 
 async function executeSwap() {
     try {
         const val = document.getElementById("inputAmount").value;
         const amtIn = ethers.parseUnits(val, 18);
+        
+        // 1. WAJIB APPROVE DULU (Gaya Rabby)
         await ensureApproval(CONFIG.T_IN, amtIn);
+        
+        // 2. BARU EKSEKUSI SWAP
         const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
         const minOut = (ethers.parseUnits(document.getElementById("outputAmount").value, 18) * 97n) / 100n;
-        log("Swapping... ⏳");
+        
+        log("Konfirmasi Swap... ⏳");
         const tx = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amtIn, minOut);
         await tx.wait();
+        
         saveTx("Swap WOPN ➔ OPNT", tx.hash, "Success");
         log("Swap Success 🔥");
         updateBalances();
-    } catch (err) { log("Swap Gagal", true); }
+    } catch (err) { log("Transaksi Dibatalkan/Gagal", true); }
 }
 
 async function executeAddLiquidity() {
@@ -152,13 +162,29 @@ async function executeAddLiquidity() {
 
 window.executeRemoveLiquidity = async (percent) => {
     try {
+        const router = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, rpcProvider);
+        const poolAddr = await router.getPool(CONFIG.T_IN, CONFIG.T_OUT);
+        const lpToken = new ethers.Contract(poolAddr, ABI_TOKEN, signer);
+        
+        // Cek dulu berapa jumlah LP yang dimiliki user
+        const userLpBalance = await lpToken.balanceOf(userAddress);
+        // Hitung jumlah yang mau di-approve berdasarkan %
+        const amtToApprove = (userLpBalance * BigInt(percent === 4 ? 100 : percent * 25)) / 100n;
+
+        // 1. WAJIB APPROVE LP TOKEN
+        log("Approve LP Token... 🛡️");
+        const txApprove = await lpToken.approve(CONFIG.BOZZ_ROUTER, amtToApprove);
+        await txApprove.wait();
+
+        // 2. EKSEKUSI REMOVE
         log("Removing... ⏳");
         const tx = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer)).removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
         await tx.wait();
+        
         saveTx(`Remove Liq ${percent==4?'100':percent*25}%`, tx.hash, "Success");
         log("Liquidity Removed! 💸");
         updateBalances();
-    } catch (err) { log("Remove Error", true); }
+    } catch (err) { log("Remove Dibatalkan", true); }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
