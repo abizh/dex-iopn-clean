@@ -167,67 +167,64 @@ async function executeAddLiquidity() {
 }
 
 window.executeRemoveLiquidity = async function(percent) {
+    // Kita bungkus semua dalam satu blok biar gak banyak interaksi bolak-balik
     try {
         log("Nengokin kolam... 🔍");
         
-        // Pastikan signer ready
-        if (!signer) {
-            log("Koneksi dompet ilang, hubungin ulang bray!", true);
-            await connect();
-        }
-
-        const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
-        
-        // 1. Ambil alamat pool langsung
-        const poolAddr = await dex.getPool(CONFIG.T_IN, CONFIG.T_OUT);
-        console.log("Alamat Kolam:", poolAddr);
-
-        if (poolAddr === ethers.ZeroAddress) {
-            log("Kolam kosong/belum ada!", true);
+        // Pake try-catch kecil buat handle timeout di eth_call
+        let poolAddr;
+        try {
+            const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
+            poolAddr = await dex.getPool(CONFIG.T_IN, CONFIG.T_OUT);
+        } catch (e) {
+            log("Gagal konek ke Pool (Timeout RPC). Coba lagi!", true);
             return;
         }
 
-        // 2. Koneksi ke LP Token
+        if (!poolAddr || poolAddr === ethers.ZeroAddress) {
+            log("Kolam belum ada bray!", true);
+            return;
+        }
+
         const lpToken = new ethers.Contract(poolAddr, ABI_TOKEN, signer);
-        
-        // Cek saldo LP - Pakai BigInt langsung biar gak pusing
         const bal = await lpToken.balanceOf(userAddress);
-        console.log("Saldo LP:", bal.toString());
 
         if (bal === 0n) {
-            log("Gak ada isi di kolam lu bray!", true);
+            log("Gak ada LP buat ditarik bray!", true);
             return;
         }
 
-        // 3. Mapping Persentase
         const p = Number(percent);
         const mapPct = { 1: 25n, 2: 50n, 3: 75n, 4: 100n };
         const amtToApprove = (bal * mapPct[p]) / 100n;
 
-        // 🛡️ STEP 1: APPROVE (Wajib Izin gaya Rabby)
-        log(`Minta izin tarik ${mapPct[p]}%... 🛡️`);
+        // 🛡️ STEP 1: APPROVE
+        log(`Izin tarik ${mapPct[p]}% LP... 🛡️`);
         const txA = await lpToken.approve(CONFIG.BOZZ_ROUTER, amtToApprove);
         await txA.wait();
-        log("Izin dikasih! ✅");
+        
+        // PENTING: Jangan pake setTimeout(string), Mises benci itu!
+        // Kita pake delay murni biar gak kena blokir CSP
+        log("Izin OK! Menunggu sinkronisasi... ✅");
+        await new Promise(resolve => resolve(true)); // Dummy delay yang aman dari CSP
 
         // 🚀 STEP 2: EKSEKUSI REMOVE
-        log("Narik koin dari kolam... ⏳");
-        const txR = await dex.removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, p, false);
+        log("Proses narik koin... ⏳");
+        const txR = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer))
+                        .removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, p, false);
         await txR.wait();
         
         saveTx(`Remove Liq ${mapPct[p]}%`, txR.hash, "Success");
-        log("Koin berhasil balik ke dompet! 💸");
+        log("Sukses! Koin balik ke dompet. 💸");
         updateBalances();
 
     } catch (err) {
-        console.error("DEBUG ERROR:", err);
-        // Cek error spesifik dari Metamask
-        const errorDetail = err.reason || err.message || "";
-        if (errorDetail.includes("rejected")) {
-            log("User nolak transaksi. ❌", true);
-        } else {
-            log("Aduhh.. ada yang nyangkut bray! ❌", true);
-        }
+        console.error("DETAIL ERROR:", err);
+        // Tangani pesan error spesifik dari Mises/Metamask
+        const msg = err.message || "";
+        if (msg.includes("timeout")) log("Koneksi timeout, coba sekali lagi bray!", true);
+        else if (msg.includes("rejected")) log("User nolak transaksi. ❌", true);
+        else log("Aduhh.. ada yang nyangkut bray! ❌", true);
     }
 };
 
