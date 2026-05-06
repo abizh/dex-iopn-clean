@@ -51,6 +51,16 @@
 
         <div id="liq-section" class="hidden">
             <div class="label-row" style="margin-bottom: 10px;"><span>Suntik Likuiditas (Pool WOPN/OPNT)</span></div>
+           <div id="liq-section" class="hidden">
+    <button id="btnLiquidity" class="btn-action" disabled>TAMBAH LIKUIDITAS</button>
+    
+    <div class="label-row" style="margin-top:20px;"><span>Tarik Likuiditas</span></div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+        <button class="btn-connect" onclick="executeRemoveLiquidity(2)">Tarik 50%</button>
+        <button class="btn-connect" onclick="executeRemoveLiquidity(4)">Tarik 100%</button>
+    </div>
+           </div>
+            
             <div class="input-box">
                 <div class="label-row"><span>WOPN Amount</span></div>
                 <input type="text" id="inputAmtA" inputmode="decimal" placeholder="0.0">
