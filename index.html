@@ -46,16 +46,16 @@
                 <div class="label-row"><span>TERIMA (OPNT)</span><span id="balOut">Saldo: 0.0</span></div>
                 <input type="text" id="outputAmount" placeholder="0.0" readonly>
             </div>
-            <button id="btnSwap" class="btn-action" disabled>SWAP SEKARANG</button>
+            <button id="btnSwap" class="btn-action" disabled>SWAP</button>
         </div>
 
         <div id="liq-section" class="hidden">
-            <div class="label-row" style="margin-bottom: 10px;"><span>Suntik Likuiditas (Pool WOPN/OPNT)</span></div>
+            <div class="label-row" style="margin-bottom: 10px;"><span>Tambah Likuiditas (Pool WOPN/OPNT)</span></div>
            <div id="liq-section" class="hidden">
-    <button id="btnLiquidity" class="btn-action" disabled>TAMBAH LIKUIDITAS</button>
     
-    <div class="label-row" style="margin-top:20px;"><span>Tarik Likuiditas</span></div>
+    <div class="label-row" style="margin-top:20px;"><span>Hapus Likuiditas</span></div>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+        <button class="btn-connect" onclick="executeRemoveLiquidity(2)">Tarik 25%</button>
         <button class="btn-connect" onclick="executeRemoveLiquidity(2)">Tarik 50%</button>
         <button class="btn-connect" onclick="executeRemoveLiquidity(4)">Tarik 100%</button>
     </div>
