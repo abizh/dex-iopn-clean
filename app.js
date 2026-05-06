@@ -1,5 +1,5 @@
 // ==========================================================
-// 🚀 BOZZDEX MEGA-MASTER CODE - V2.3 (ADVANCED ENGINE)
+// 🚀 BOZZDEX MEGA-MASTER CODE - V2.4 (ANTI-MELEDAK)
 // ==========================================================
 
 const CONFIG = {
@@ -7,19 +7,16 @@ const CONFIG = {
     CHAIN_ID: "0x3d8",
     T_IN: ethers.getAddress("0xbc022c9deb5af250a526321d16ef52e39b4dbd84"),
     T_OUT: ethers.getAddress("0x2aec1db9197ff284011a6a1d0752ad03f5782b0d"),
-    OFFICIAL_ROUTER: "0xB489bce5c9c9364da2D1D1Bc5CE4274F63141885",
     BOZZ_ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961"
 };
 
 const ABI_TOKEN = [
     "function balanceOf(address) view returns (uint256)",
-    "function decimals() view returns (uint8)",
     "function allowance(address,address) view returns (uint256)",
     "function approve(address,uint256) external returns (bool)"
 ];
 
 const ABI_ROUTER = [
-    "function getAmountsOut(uint amountIn, address[] memory path) view returns (uint[] memory)",
     "function swap(address,address,uint256,uint256) external",
     "function addLiquidity(address tA, address tB, uint256 amtA, uint256 amtB) external",
     "function removeLiquidityMulti(address tA, address tB, uint8 percentChoice, bool toNative) external",
@@ -37,17 +34,13 @@ let debounceTimer;
 
 function log(msg, isError = false) {
     const el = document.getElementById("statusLog");
-    if (el) el.innerText = (isError ? "❌ " : "> ") + msg;
-    console.log("[BOZZDEX]", msg);
+    if (el) el.innerHTML = (isError ? "❌ " : "> ") + msg;
 }
 
-// --- CORE ---
 async function connect() {
     if (!window.ethereum) return alert("Install Wallet!");
     try {
         rpcProvider = new ethers.JsonRpcProvider(CONFIG.RPC);
-        let chainId = await window.ethereum.request({ method: "eth_chainId" });
-        if (chainId !== CONFIG.CHAIN_ID) await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CONFIG.CHAIN_ID }] });
         const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
         userAddress = accounts[0];
         walletProvider = new ethers.BrowserProvider(window.ethereum);
@@ -69,7 +62,7 @@ async function updateBalances() {
     document.getElementById("balOut").innerText = "Saldo: " + ethers.formatUnits(bOut, 18);
 }
 
-// --- LOGIC SWAP & PRICE IMPACT ---
+// --- FIX PRICE IMPACT & INPUT SYNC ---
 function setupInput() {
     const input = document.getElementById("inputAmount");
     const output = document.getElementById("outputAmount");
@@ -86,57 +79,52 @@ function setupInput() {
                 
                 const [r0, r1, t0] = await Promise.all([pool.reserve0(), pool.reserve1(), pool.token0()]);
                 
-                // 1. Normalisasi Reserve ke Number (biar itungan persentase akurat)
+                // Normalisasi Reserve (Konversi BigInt ke Number biasa)
                 const resIn = Number(ethers.formatUnits(CONFIG.T_IN === t0 ? r0 : r1, 18));
                 const resOut = Number(ethers.formatUnits(CONFIG.T_IN === t0 ? r1 : r0, 18));
                 
                 const amtIn = Number(val);
+                const amtInWithFee = amtIn * 0.997; // Fee 0.3%
                 
-                // 2. Rumus AMM: (x * y) / (x + bin)
-                // Kita itung manual di JS buat simulasi harga
-                const amtInWithFee = amtIn * 0.997; // Potong fee 0.3%
+                // Rumus AMM: amtOut = (amtIn * resOut) / (resIn + amtIn)
                 const amtOut = (amtInWithFee * resOut) / (resIn + amtInWithFee);
-                
                 output.value = amtOut.toFixed(18);
 
-                // 3. HITUNG PRICE IMPACT YANG BENER
-                // Spot Price = reserveOut / reserveIn
-                // Execution Price = amtOut / amtIn
+                // Hitung Impact: ((SpotPrice - ExecutionPrice) / SpotPrice) * 100
                 const spotPrice = resOut / resIn;
                 const executionPrice = amtOut / amtIn;
-                
                 const impact = ((spotPrice - executionPrice) / spotPrice) * 100;
 
-                // 4. Update UI Log
-                const logColor = impact > 5 ? "color: #da3633;" : "color: #7ee787;";
-                const statusLog = document.getElementById("statusLog");
-                statusLog.innerHTML = `Price Impact: <span style="${logColor}">${impact.toFixed(2)}%</span> ${impact > 5 ? '⚠️' : '✅'}`;
-
+                const color = impact > 5 ? "#da3633" : "#7ee787";
+                log(`Price Impact: <span style="color:${color}; font-weight:bold;">${impact.toFixed(2)}%</span> ${impact > 5 ? '⚠️' : '✅'}`);
             } catch (err) {
-                console.error("Price Calc Error:", err);
+                console.error(err);
                 output.value = "Error";
             }
         }, 400);
     };
 }
 
-// --- ACTIONS ---
+// --- TRANSACTIONS ---
 async function ensureApproval(token, amt) {
     const c = new ethers.Contract(token, ABI_TOKEN, signer);
-    if (await c.allowance(userAddress, CONFIG.BOZZ_ROUTER) < amt) {
+    const allowance = await c.allowance(userAddress, CONFIG.BOZZ_ROUTER);
+    if (allowance < amt) {
         log("Approving...");
-        await (await c.approve(CONFIG.BOZZ_ROUTER, ethers.MaxUint256)).wait();
+        const tx = await c.approve(CONFIG.BOZZ_ROUTER, ethers.MaxUint256);
+        await tx.wait();
     }
 }
 
 async function executeSwap() {
     try {
-        const amtIn = ethers.parseUnits(document.getElementById("inputAmount").value, 18);
+        const val = document.getElementById("inputAmount").value;
+        const amtIn = ethers.parseUnits(val, 18);
         await ensureApproval(CONFIG.T_IN, amtIn);
         const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
         const minOut = (ethers.parseUnits(document.getElementById("outputAmount").value, 18) * 97n) / 100n;
-        const tx = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amtIn, minOut);
         log("Swapping... ⏳");
+        const tx = await dex.swap(CONFIG.T_IN, CONFIG.T_OUT, amtIn, minOut);
         await tx.wait();
         log("Swap Success 🔥");
         updateBalances();
@@ -149,6 +137,7 @@ async function executeAddLiquidity() {
         const amtB = ethers.parseUnits(document.getElementById("inputAmtB").value, 18);
         await ensureApproval(CONFIG.T_IN, amtA);
         await ensureApproval(CONFIG.T_OUT, amtB);
+        log("Suntik Dana... ⏳");
         const tx = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer)).addLiquidity(CONFIG.T_IN, CONFIG.T_OUT, amtA, amtB);
         await tx.wait();
         log("Liquidity Added! 💉");
@@ -158,19 +147,18 @@ async function executeAddLiquidity() {
 
 async function executeRemoveLiquidity(percent) {
     try {
-        const tx = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer)).removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
         log("Removing... ⏳");
+        const tx = await (new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer)).removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
         await tx.wait();
         log("Liquidity Removed! 💸");
         updateBalances();
     } catch (err) { log("Remove Error", true); }
 }
 
-// --- INIT ---
 document.addEventListener("DOMContentLoaded", () => {
     setupInput();
     document.getElementById("btnConnect").onclick = connect;
     document.getElementById("btnSwap").onclick = executeSwap;
     if(document.getElementById("btnLiquidity")) document.getElementById("btnLiquidity").onclick = executeAddLiquidity;
 });
-            
+        
