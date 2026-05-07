@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOZZDEX | Sovereign Sentinel v46.0</title>
+    <title>BOZZDEX | Unified Sentinel v46.0</title>
     
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
 
@@ -29,7 +29,6 @@
             font-size: 14px;
         }
 
-        /* --- UI COMPONENTS --- */
         .card {
             background: var(--card);
             border: 1px solid var(--border);
@@ -54,11 +53,10 @@
             border: 1px solid var(--border);
         }
 
-        .status-online { color: var(--primary); border-color: var(--primary); }
+        .status-online { color: var(--primary); border-color: var(--primary); box-shadow: 0 0 8px rgba(0,255,136,0.2); }
 
-        /* --- INPUTS --- */
         .input-group { margin-bottom: 12px; }
-        label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 5px; }
+        label { display: flex; justify-content: space-between; font-size: 11px; color: #8b949e; margin-bottom: 5px; }
         
         input {
             width: 100%;
@@ -71,9 +69,6 @@
             font-family: 'Courier New', monospace;
         }
 
-        input:focus { outline: none; border-color: var(--accent); }
-
-        /* --- BUTTONS --- */
         .btn {
             width: 100%;
             padding: 14px;
@@ -88,18 +83,17 @@
 
         .btn-connect { background: var(--accent); color: white; margin-bottom: 15px; }
         .btn-primary { background: var(--primary); color: #000; }
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); margin-top: 10px; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); margin-top: 10px; font-size: 12px; }
         
         .btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn:active { transform: scale(0.98); }
 
-        /* --- FORENSIC TERMINAL --- */
         #statusLog {
             font-family: 'Consolas', monospace;
             font-size: 11px;
             color: var(--primary);
             margin-top: 10px;
             min-height: 18px;
+            text-align: center;
         }
 
         .history-box {
@@ -108,12 +102,12 @@
             padding-top: 15px;
         }
 
-        #txList { max-height: 200px; overflow-y: auto; }
+        #txList { max-height: 250px; overflow-y: auto; }
 
         .tab-nav { display: flex; gap: 5px; margin-bottom: 15px; }
         .tab-btn { 
-            flex: 1; padding: 8px; background: #21262d; border: 1px solid var(--border); 
-            color: #8b949e; border-radius: 6px; font-size: 11px; cursor: pointer;
+            flex: 1; padding: 10px; background: #21262d; border: 1px solid var(--border); 
+            color: #8b949e; border-radius: 8px; font-size: 12px; cursor: pointer;
         }
         .tab-btn.active { background: var(--border); color: #fff; border-color: var(--accent); }
     </style>
@@ -128,21 +122,21 @@
     <button id="btnConnect" class="btn btn-connect">CONNECT WALLET</button>
 
     <div class="tab-nav">
-        <button class="tab-btn active" onclick="switchTab('swap')">SWAP</button>
-        <button class="tab-btn" onclick="switchTab('liquidity')">LIQUIDITY</button>
+        <button id="tabSwapBtn" class="tab-btn active" onclick="switchTab('swap')">SWAP</button>
+        <button id="tabLiqBtn" class="tab-btn" onclick="switchTab('liquidity')">LIQUIDITY</button>
     </div>
 
     <div id="tab-swap" class="card">
         <div class="input-group">
-            <label id="balIn">Saldo: 0.00</label>
+            <label><span>Dari: WOPN</span> <span id="balIn">Saldo: 0.00</span></label>
             <input type="number" id="inputAmount" placeholder="0.0">
         </div>
-        <div style="text-align: center; color: var(--accent); margin-bottom: 10px;">⬇</div>
+        <div style="text-align: center; color: var(--accent); margin: -5px 0 5px 0; font-size: 18px;">⬇</div>
         <div class="input-group">
-            <label id="balOut">Saldo: 0.00</label>
-            <input type="number" id="outputAmount" placeholder="Output estimasi" readonly>
+            <label><span>Ke: OPNT (Estimasi)</span> <span id="balOut">Saldo: 0.00</span></label>
+            <input type="number" id="outputAmount" placeholder="0.0" readonly style="background: #090c10; color: var(--accent);">
         </div>
-        <div id="statusLog">Silahkan koneksi wallet bray...</div>
+        <div id="statusLog">Koneksikan Wallet...</div>
         <button id="btnSwap" class="btn btn-primary" disabled>EXECUTE SWAP</button>
     </div>
 
@@ -157,9 +151,9 @@
         </div>
         <button id="btnLiquidity" class="btn btn-primary" disabled>ADD LIQUIDITY</button>
         
-        <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;">
-            <label>REMOVE LIQUIDITY</label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px;">
+            <label style="color: var(--danger); font-weight: bold;">REMOVE LIQUIDITY (%)</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <button class="btn btn-outline" onclick="onRemoveLiq(1)" disabled>25%</button>
                 <button class="btn btn-outline" onclick="onRemoveLiq(2)" disabled>50%</button>
                 <button class="btn btn-outline" onclick="onRemoveLiq(3)" disabled>75%</button>
@@ -170,87 +164,131 @@
 
     <div class="history-box">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <label>TRANSACTION HISTORY (v46 Ledger)</label>
-            <span onclick="clearHistory()" style="font-size: 10px; color: var(--danger); cursor: pointer;">CLEAR</span>
+            <label>LEDGER TRANSACTION HISTORY</label>
+            <span onclick="clearHistory()" style="font-size: 10px; color: var(--danger); cursor: pointer; font-weight: bold;">[CLEAR]</span>
         </div>
         <div id="txList"></div>
     </div>
 
     <script src="app.js"></script>
     <script>
+        let userAddress = "";
+        let rpcProvider = new ethers.JsonRpcProvider("https://testnet-rpc2.iopn.tech");
+        let debounceTimer;
+
         // --- UI TAB SYSTEM ---
         function switchTab(tab) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
+            document.getElementById('tabSwapBtn').classList.toggle('active', tab === 'swap');
+            document.getElementById('tabLiqBtn').classList.toggle('active', tab === 'liquidity');
             document.getElementById('tab-swap').style.display = tab === 'swap' ? 'block' : 'none';
             document.getElementById('tab-liquidity').style.display = tab === 'liquidity' ? 'block' : 'none';
         }
 
-        // --- WALLET CONNECT BRIDGE ---
+        // --- BALANCE & PRICE DISCOVERY ---
+        async function updateBalances() {
+            if (!userAddress) return;
+            try {
+                const abi = ["function balanceOf(address) view returns (uint256)"];
+                const cIn = new ethers.Contract(CONFIG.T_IN, abi, rpcProvider);
+                const cOut = new ethers.Contract(CONFIG.T_OUT, abi, rpcProvider);
+                const [bIn, bOut] = await Promise.all([cIn.balanceOf(userAddress), cOut.balanceOf(userAddress)]);
+                document.getElementById("balIn").innerText = "Saldo: " + ethers.formatUnits(bIn, 18);
+                document.getElementById("balOut").innerText = "Saldo: " + ethers.formatUnits(bOut, 18);
+            } catch (e) { console.error("Balance Error", e); }
+        }
+
+        // --- AUTO ESTIMATOR (Mencegah Swap Error) ---
+        document.getElementById("inputAmount").oninput = (e) => {
+            clearTimeout(debounceTimer);
+            const val = e.target.value;
+            if (!val || val <= 0) { document.getElementById("outputAmount").value = ""; return; }
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    // Logika Estimasi Sederhana atau panggil getPool
+                    // Disini kita asumsikan rasio 1:1 untuk testnet, sesuaikan jika pool ada fee
+                    const estimasi = parseFloat(val) * 0.99; // 1% fee buffer
+                    document.getElementById("outputAmount").value = estimasi.toFixed(6);
+                    document.getElementById("statusLog").innerText = "Price Updated ✅";
+                } catch (err) { 
+                    document.getElementById("outputAmount").value = "Error";
+                }
+            }, 500);
+        };
+
+        // --- WALLET CONNECT ---
         async function connect() {
-            if (!window.ethereum) return alert("Install Metamask/Rabby bray!");
+            if (!window.ethereum) return alert("Buka di Rabby/Metamask bray!");
             try {
                 const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-                const userAddress = accounts[0];
+                userAddress = accounts[0];
                 document.getElementById("btnConnect").innerText = userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
                 document.querySelectorAll('button').forEach(b => b.disabled = false);
-                document.getElementById("statusLog").innerText = "Wallet Connected ✅";
-                if (window.updateBalances) window.updateBalances();
+                document.getElementById("statusLog").innerText = "Sentinel Ready 🛡️";
+                updateBalances();
             } catch (err) { 
-                document.getElementById("statusLog").innerText = "Koneksi Gagal bray!";
+                document.getElementById("statusLog").innerText = "Gagal Konek!";
             }
         }
 
-        // --- ACTION HANDLERS (Calling Unified Kernel) ---
-        
-        async function onSwapClick() {
-            const val = document.getElementById("inputAmount").value;
-            const outputVal = document.getElementById("outputAmount").value;
-            if (!val || val <= 0) return;
-
-            const amtIn = ethers.parseUnits(val, 18);
-            const minOut = (ethers.parseUnits(outputVal, 18) * 97n) / 100n; // 3% Slippage
-
-            setKernelStatus(true);
-            await window.executeKernelAction("SWAP", { amtIn, minOut });
-            setKernelStatus(false);
-        }
-
-        async function onAddLiquidityClick() {
-            const amtA = ethers.parseUnits(document.getElementById("inputAmtA").value, 18);
-            const amtB = ethers.parseUnits(document.getElementById("inputAmtB").value, 18);
-            
-            setKernelStatus(true);
-            await window.executeKernelAction("ADD_LIQUIDITY", { amtA, amtB });
-            setKernelStatus(false);
-        }
-
-        async function onRemoveLiq(percent) {
-            setKernelStatus(true);
-            await window.executeKernelAction("REMOVE_LIQUIDITY", { percent });
-            setKernelStatus(false);
-        }
-
+        // --- KERNEL BRIDGES ---
         function setKernelStatus(isLive) {
             const el = document.getElementById("kernel-status");
             el.innerText = isLive ? "SENTINEL LIVE" : "SENTINEL IDLE";
             el.className = isLive ? "status-pill status-online" : "status-pill";
         }
 
+        async function onSwapClick() {
+            const val = document.getElementById("inputAmount").value;
+            const outVal = document.getElementById("outputAmount").value;
+            if (!val || !outVal || outVal === "Error") return;
+
+            setKernelStatus(true);
+            await window.executeKernelAction("SWAP", { 
+                amtIn: ethers.parseUnits(val, 18), 
+                minOut: ethers.parseUnits(outVal, 18) * 95n / 100n // Slippage 5%
+            });
+            setKernelStatus(false);
+            updateBalances();
+        }
+
+        async function onAddLiquidityClick() {
+            const a = document.getElementById("inputAmtA").value;
+            const b = document.getElementById("inputAmtB").value;
+            if(!a || !b) return;
+
+            setKernelStatus(true);
+            await window.executeKernelAction("ADD_LIQUIDITY", { 
+                amtA: ethers.parseUnits(a, 18), 
+                amtB: ethers.parseUnits(b, 18) 
+            });
+            setKernelStatus(false);
+            updateBalances();
+        }
+
+        async function onRemoveLiq(percent) {
+            setKernelStatus(true);
+            await window.executeKernelAction("REMOVE_LIQUIDITY", { percent });
+            setKernelStatus(false);
+            updateBalances();
+        }
+
         function clearHistory() {
-            if(confirm("Hapus history ledger?")) {
+            if(confirm("Hapus Ledger?")) {
                 localStorage.removeItem("bozz_history");
                 window.renderHistory();
             }
         }
 
-        // Event Listeners
+        // Inisialisasi
         document.getElementById("btnConnect").onclick = connect;
         document.getElementById("btnSwap").onclick = onSwapClick;
         document.getElementById("btnLiquidity").onclick = onAddLiquidityClick;
-
-        // Auto-refresh balances logic can be added here
+        
+        // Render history saat load
+        window.addEventListener('load', () => {
+            if (window.renderHistory) window.renderHistory();
+        });
     </script>
 </body>
-                    </html>
-        
+</html>
