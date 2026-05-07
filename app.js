@@ -176,35 +176,121 @@ async function executeAddLiquidity() {
     } catch (err) { log("Add Liq Error", true); }
 }
 
-async function executeRemoveLiquidity(percent) {
+window.executeRemoveLiquidity = async (percent) => {
+
     try {
-        const router = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, rpcProvider);
+
+        // =========================
+        // ROUTER
+        // =========================
+        const dex = new ethers.Contract(
+            CONFIG.BOZZ_ROUTER,
+            ABI_ROUTER,
+            signer
+        );
+
+        // =========================
+        // AMBIL POOL ADDRESS
+        // =========================
+        const poolAddress = await dex.getPool(
+            CONFIG.T_IN,
+            CONFIG.T_OUT
+        );
+
+        console.log("POOL:", poolAddress);
+
+        // =========================
+        // LP ABI
+        // =========================
+        const ABI_LP = [
+            "function balanceOf(address) view returns(uint256)",
+            "function allowance(address,address) view returns(uint256)",
+            "function approve(address,uint256) returns(bool)"
+        ];
+
+        // =========================
+        // LP CONTRACT
+        // =========================
         const lp = new ethers.Contract(
-   poolAddress,
-   ABI_POOL,
-   signer
-);
-        
-        // Kita butuh approve LP Token sebelum remove
-        log("Checking LP Approval... 🛡️");
-        const lpToken = new ethers.Contract(poolAddr, ABI_TOKEN, signer);
-        const allowance = await lpToken.allowance(userAddress, CONFIG.BOZZ_ROUTER);
-        
-        if (allowance === 0n) {
-            log("Approving LP Token... ⏳");
-            const txApprove = await lpToken.approve(CONFIG.BOZZ_ROUTER, ethers.MaxUint256);
-            await txApprove.wait();
+            poolAddress,
+            ABI_LP,
+            signer
+        );
+
+        // =========================
+        // CEK LP BALANCE
+        // =========================
+        const lpBalance = await lp.balanceOf(userAddress);
+
+        console.log("LP BALANCE:", lpBalance.toString());
+
+        if (lpBalance <= 0n) {
+            log("LP Balance kosong ❌", true);
+            return;
         }
 
-        log("Removing Liquidity... ⏳");
-        const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
-        const tx = await dex.removeLiquidityMulti(CONFIG.T_IN, CONFIG.T_OUT, percent, false);
+        // =========================
+        // CEK APPROVAL
+        // =========================
+        const allowance = await lp.allowance(
+            userAddress,
+            CONFIG.BOZZ_ROUTER
+        );
+
+        console.log("ALLOWANCE:", allowance.toString());
+
+        // =========================
+        // APPROVE JIKA BELUM
+        // =========================
+        if (allowance < lpBalance) {
+
+            log("Approve LP...");
+
+            const txApprove = await lp.approve(
+                CONFIG.BOZZ_ROUTER,
+                ethers.MaxUint256
+            );
+
+            await txApprove.wait();
+
+            log("LP Approved ✅");
+        }
+
+        // =========================
+        // REMOVE
+        // =========================
+        log("Removing Liquidity...");
+
+        const tx = await dex.removeLiquidityMulti(
+            CONFIG.T_IN,
+            CONFIG.T_OUT,
+            percent,
+            false
+        );
+
         await tx.wait();
-        
-        saveTx(`Remove Liq ${percent==4?'100':percent*25}%`, tx.hash, "Success");
-        log("Liquidity Removed! 💸");
+
+        saveTx(
+            `Remove Liq ${percent == 4 ? '100' : percent * 25}%`,
+            tx.hash,
+            "Success"
+        );
+
+        log("Liquidity Removed 💸");
+
         updateBalances();
-    } catch (err) { log("Remove Error", true); }
+
+    } catch (err) {
+
+        console.error("REMOVE ERROR:", err);
+
+        log(
+            err.shortMessage ||
+            err.reason ||
+            err.message,
+            true
+        );
+    }
     }
         
 document.addEventListener("DOMContentLoaded", () => {
