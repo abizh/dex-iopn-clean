@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sovereign Sentinel v46.0 | Dashboard</title>
+    <title>BOZZDEX | Sovereign Sentinel v46.0</title>
     
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
 
     <style>
         :root {
-            --bg: #0a0a0c;
-            --surface: #16161a;
+            --bg: #0d1117;
+            --card: #161b22;
             --primary: #00ff88;
-            --warning: #ffcc00;
+            --accent: #58a6ff;
             --danger: #ff4444;
-            --text: #e0e0e0;
-            --border: #333;
+            --text: #c9d1d9;
+            --border: #30363d;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -23,239 +23,234 @@
         body {
             background: var(--bg);
             color: var(--text);
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
             margin: 0;
-            padding: 15px;
+            padding: 10px;
             font-size: 14px;
         }
 
-        /* --- STATUS CARD --- */
+        /* --- UI COMPONENTS --- */
         .card {
-            background: var(--surface);
+            background: var(--card);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            padding: 15px;
+            margin-bottom: 12px;
         }
 
-        .header {
+        .header-box {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 10px;
+            margin-bottom: 15px;
         }
 
-        .kernel-title {
-            font-weight: 800;
-            letter-spacing: 1px;
-            color: var(--primary);
-        }
-
-        .badge {
-            padding: 5px 10px;
+        .status-pill {
+            padding: 4px 8px;
             border-radius: 6px;
-            font-size: 11px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .badge-idle { background: #333; color: #aaa; }
-        .badge-live { background: var(--primary); color: #000; box-shadow: 0 0 10px var(--primary); }
-
-        /* --- METADATA GRID --- */
-        .meta-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .meta-item {
-            background: rgba(255,255,255,0.03);
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .meta-label {
             font-size: 10px;
-            color: #777;
-            display: block;
-            margin-bottom: 4px;
-            text-transform: uppercase;
+            font-weight: bold;
+            background: #21262d;
+            border: 1px solid var(--border);
         }
 
-        .meta-value {
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            word-break: break-all;
-            color: #fff;
-        }
+        .status-online { color: var(--primary); border-color: var(--primary); }
 
-        /* --- ACTION BUTTON --- */
-        .btn-execute {
+        /* --- INPUTS --- */
+        .input-group { margin-bottom: 12px; }
+        label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 5px; }
+        
+        input {
             width: 100%;
-            background: var(--primary);
-            color: #000;
-            border: none;
-            padding: 18px;
+            background: #0d1117;
+            border: 1px solid var(--border);
+            padding: 12px;
             border-radius: 8px;
-            font-weight: 900;
+            color: #fff;
             font-size: 16px;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-transform: uppercase;
+            font-family: 'Courier New', monospace;
         }
 
-        .btn-execute:active { transform: scale(0.96); opacity: 0.8; }
-        .btn-execute:disabled {
-            background: #222;
-            color: #555;
-            cursor: not-allowed;
-            transform: none;
+        input:focus { outline: none; border-color: var(--accent); }
+
+        /* --- BUTTONS --- */
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 8px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s;
+            margin-top: 5px;
         }
+
+        .btn-connect { background: var(--accent); color: white; margin-bottom: 15px; }
+        .btn-primary { background: var(--primary); color: #000; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); margin-top: 10px; }
+        
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .btn:active { transform: scale(0.98); }
 
         /* --- FORENSIC TERMINAL --- */
-        .terminal-label {
+        #statusLog {
+            font-family: 'Consolas', monospace;
             font-size: 11px;
-            color: #555;
-            margin-bottom: 8px;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
+            color: var(--primary);
+            margin-top: 10px;
+            min-height: 18px;
         }
 
-        #terminal {
-            background: #000;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            height: 250px;
-            overflow-y: auto;
-            padding: 12px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 11px;
-            color: #00ff66;
-            line-height: 1.4;
+        .history-box {
+            margin-top: 20px;
+            border-top: 1px solid var(--border);
+            padding-top: 15px;
         }
 
-        .log-line { margin-bottom: 6px; border-bottom: 1px solid #111; padding-bottom: 2px; }
-        .log-ts { color: #444; margin-right: 5px; }
-        .log-type-INTENT { color: var(--warning); }
-        .log-type-HASH { color: #00ccff; }
-        .log-type-FINALIZED { color: var(--primary); font-weight: bold; }
-        .log-type-FAULT { color: var(--danger); }
-        .log-type-TERMINATED { color: #ff00ff; }
+        #txList { max-height: 200px; overflow-y: auto; }
+
+        .tab-nav { display: flex; gap: 5px; margin-bottom: 15px; }
+        .tab-btn { 
+            flex: 1; padding: 8px; background: #21262d; border: 1px solid var(--border); 
+            color: #8b949e; border-radius: 6px; font-size: 11px; cursor: pointer;
+        }
+        .tab-btn.active { background: var(--border); color: #fff; border-color: var(--accent); }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <div class="header">
-            <div class="kernel-title">SENTINEL KERNEL v46.0</div>
-            <div id="status-badge" class="badge badge-idle">System Idle</div>
-        </div>
-
-        <div class="meta-grid">
-            <div class="meta-item">
-                <span class="meta-label">Active Epoch</span>
-                <span id="meta-epoch" class="meta-value">---</span>
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">Lease Sequence</span>
-                <span id="meta-seq" class="meta-value">0</span>
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">Leadership Token</span>
-                <span id="meta-token" class="meta-value">VACANT</span>
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">Session ID</span>
-                <span id="meta-sid" class="meta-value">---</span>
-            </div>
-        </div>
-
-        <button id="main-action" class="btn-execute" onclick="triggerExecution()">
-            Execute Transaction
-        </button>
+    <div class="header-box">
+        <div style="font-weight: 800; font-size: 18px; color: var(--primary);">BOZZDEX <span style="font-size: 10px; color: #555;">v46.0</span></div>
+        <div id="kernel-status" class="status-pill">SENTINEL IDLE</div>
     </div>
 
-    <div class="terminal-label">
-        <span>LIVE FORENSIC REPLAY ENGINE</span>
-        <span id="page-count">PAGES: 0</span>
+    <button id="btnConnect" class="btn btn-connect">CONNECT WALLET</button>
+
+    <div class="tab-nav">
+        <button class="tab-btn active" onclick="switchTab('swap')">SWAP</button>
+        <button class="tab-btn" onclick="switchTab('liquidity')">LIQUIDITY</button>
     </div>
-    <div id="terminal">
-        <div class="log-line"><span class="log-ts">[SYSTEM]</span> Kernel siap. Menunggu instruksi...</div>
+
+    <div id="tab-swap" class="card">
+        <div class="input-group">
+            <label id="balIn">Saldo: 0.00</label>
+            <input type="number" id="inputAmount" placeholder="0.0">
+        </div>
+        <div style="text-align: center; color: var(--accent); margin-bottom: 10px;">⬇</div>
+        <div class="input-group">
+            <label id="balOut">Saldo: 0.00</label>
+            <input type="number" id="outputAmount" placeholder="Output estimasi" readonly>
+        </div>
+        <div id="statusLog">Silahkan koneksi wallet bray...</div>
+        <button id="btnSwap" class="btn btn-primary" disabled>EXECUTE SWAP</button>
+    </div>
+
+    <div id="tab-liquidity" class="card" style="display: none;">
+        <div class="input-group">
+            <label>Token A (WOPN)</label>
+            <input type="number" id="inputAmtA" placeholder="0.0">
+        </div>
+        <div class="input-group">
+            <label>Token B (OPNT)</label>
+            <input type="number" id="inputAmtB" placeholder="0.0">
+        </div>
+        <button id="btnLiquidity" class="btn btn-primary" disabled>ADD LIQUIDITY</button>
+        
+        <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;">
+            <label>REMOVE LIQUIDITY</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button class="btn btn-outline" onclick="onRemoveLiq(1)" disabled>25%</button>
+                <button class="btn btn-outline" onclick="onRemoveLiq(2)" disabled>50%</button>
+                <button class="btn btn-outline" onclick="onRemoveLiq(3)" disabled>75%</button>
+                <button class="btn btn-outline" onclick="onRemoveLiq(4)" disabled>100%</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="history-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <label>TRANSACTION HISTORY (v46 Ledger)</label>
+            <span onclick="clearHistory()" style="font-size: 10px; color: var(--danger); cursor: pointer;">CLEAR</span>
+        </div>
+        <div id="txList"></div>
     </div>
 
     <script src="app.js"></script>
-
     <script>
-        // Inisialisasi UI Metadata
-        document.getElementById('meta-sid').innerText = window.SESSION_ID || 'INIT';
-
-        const terminal = document.getElementById('terminal');
-        const btnAction = document.getElementById('main-action');
-        const statusBadge = document.getElementById('status-badge');
-
-        // Fungsi Helper untuk Update UI dari app.js
-        function pushLog(msg, type = '') {
-            const line = document.createElement('div');
-            line.className = 'log-line';
-            const ts = new Date().toLocaleTimeString();
-            line.innerHTML = `<span class="log-ts">[${ts}]</span> <span class="log-type-${type}">${msg}</span>`;
-            terminal.appendChild(line);
-            terminal.scrollTop = terminal.scrollHeight;
+        // --- UI TAB SYSTEM ---
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-swap').style.display = tab === 'swap' ? 'block' : 'none';
+            document.getElementById('tab-liquidity').style.display = tab === 'liquidity' ? 'block' : 'none';
         }
 
-        async function triggerExecution() {
-            btnAction.disabled = true;
-            statusBadge.innerText = "Kernel Live";
-            statusBadge.className = "badge badge-live";
-            
+        // --- WALLET CONNECT BRIDGE ---
+        async function connect() {
+            if (!window.ethereum) return alert("Install Metamask/Rabby bray!");
             try {
-                // Eksekusi fungsi utama di app.js
-                await window.executeRemoveLiquidity(0);
-            } catch (e) {
-                pushLog("UI_EXCEPTION: " + e.message, 'FAULT');
-            } finally {
-                btnAction.disabled = false;
-                statusBadge.innerText = "System Idle";
-                statusBadge.className = "badge badge-idle";
+                const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+                const userAddress = accounts[0];
+                document.getElementById("btnConnect").innerText = userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
+                document.querySelectorAll('button').forEach(b => b.disabled = false);
+                document.getElementById("statusLog").innerText = "Wallet Connected ✅";
+                if (window.updateBalances) window.updateBalances();
+            } catch (err) { 
+                document.getElementById("statusLog").innerText = "Koneksi Gagal bray!";
             }
         }
 
-        // Monitoring Loop untuk visualisasi 'Ground Truth' di LocalStorage
-        setInterval(() => {
-            const lock = JSON.parse(localStorage.getItem('bozz_global_lock') || '{}');
+        // --- ACTION HANDLERS (Calling Unified Kernel) ---
+        
+        async function onSwapClick() {
+            const val = document.getElementById("inputAmount").value;
+            const outputVal = document.getElementById("outputAmount").value;
+            if (!val || val <= 0) return;
+
+            const amtIn = ethers.parseUnits(val, 18);
+            const minOut = (ethers.parseUnits(outputVal, 18) * 97n) / 100n; // 3% Slippage
+
+            setKernelStatus(true);
+            await window.executeKernelAction("SWAP", { amtIn, minOut });
+            setKernelStatus(false);
+        }
+
+        async function onAddLiquidityClick() {
+            const amtA = ethers.parseUnits(document.getElementById("inputAmtA").value, 18);
+            const amtB = ethers.parseUnits(document.getElementById("inputAmtB").value, 18);
             
-            document.getElementById('meta-epoch').innerText = lock.epoch ? lock.epoch.split('_')[1] : '---';
-            document.getElementById('meta-token').innerText = lock.token ? lock.token.substring(0, 12) + '...' : 'VACANT';
-            document.getElementById('meta-seq').innerText = lock.seq || 0;
+            setKernelStatus(true);
+            await window.executeKernelAction("ADD_LIQUIDITY", { amtA, amtB });
+            setKernelStatus(false);
+        }
 
-            if (lock.epoch) {
-                const pages = localStorage.getItem(`bozz_ledger_${lock.epoch}_latest`) || 0;
-                document.getElementById('page-count').innerText = `PAGES: ${pages}`;
-            }
+        async function onRemoveLiq(percent) {
+            setKernelStatus(true);
+            await window.executeKernelAction("REMOVE_LIQUIDITY", { percent });
+            setKernelStatus(false);
+        }
 
-            // Jika status dirubah oleh app.js (Tombstone), sesuaikan warna UI
-            if (lock.status === "RELEASED_BY_LEADER") {
-                statusBadge.innerText = "Terminated";
-                statusBadge.className = "badge badge-idle";
-            }
-        }, 1000);
+        function setKernelStatus(isLive) {
+            const el = document.getElementById("kernel-status");
+            el.innerText = isLive ? "SENTINEL LIVE" : "SENTINEL IDLE";
+            el.className = isLive ? "status-pill status-online" : "status-pill";
+        }
 
-        // Intercept console.log untuk dialirkan ke terminal visual (Opsional)
-        const originalLog = console.log;
-        console.log = function(...args) {
-            if (args[0] && args[0].includes("[SENTINEL]")) {
-                pushLog(args[0], args[0].includes("Success") ? "FINALIZED" : "");
+        function clearHistory() {
+            if(confirm("Hapus history ledger?")) {
+                localStorage.removeItem("bozz_history");
+                window.renderHistory();
             }
-            originalLog.apply(console, args);
-        };
+        }
+
+        // Event Listeners
+        document.getElementById("btnConnect").onclick = connect;
+        document.getElementById("btnSwap").onclick = onSwapClick;
+        document.getElementById("btnLiquidity").onclick = onAddLiquidityClick;
+
+        // Auto-refresh balances logic can be added here
     </script>
 </body>
-    </html>
-    
+                    </html>
+        
