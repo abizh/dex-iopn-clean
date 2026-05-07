@@ -27,7 +27,6 @@
             overflow: hidden;
         }
 
-        /* HEADER & STATUS BAR */
         header {
             padding: 1rem 2rem;
             border-bottom: 1px solid var(--border);
@@ -49,7 +48,6 @@
         .online { color: var(--primary); border-color: var(--primary); }
         .offline { color: var(--error); border-color: var(--error); }
 
-        /* MAIN LAYOUT */
         main {
             display: grid;
             grid-template-columns: 350px 1fr;
@@ -57,7 +55,6 @@
             overflow: hidden;
         }
 
-        /* SIDEBAR: VAULT & ACTIONS */
         .sidebar {
             padding: 2rem;
             border-right: 1px solid var(--border);
@@ -101,7 +98,6 @@
 
         button:disabled { opacity: 0.3; cursor: not-allowed; }
 
-        /* CONTENT: KERNEL MONITOR */
         .monitor {
             padding: 2rem;
             overflow-y: auto;
@@ -138,15 +134,13 @@
 
     <div id="signingOverlay" class="signing-overlay">
         <div class="card" style="text-align: center;">
-            <div style="margin-bottom: 1rem;">⚡ KERNEL AWAITING SIGNATURE</div>
-            <div style="font-size: 12px; color: var(--dim);">Please check your wallet provider...</div>
+            <div style="margin-bottom: 1rem; color: var(--primary);">⚡ KERNEL AWAITING SIGNATURE</div>
+            <div style="font-size: 12px; color: var(--dim);">Silakan cek MetaMask / Wallet kamu...</div>
         </div>
     </div>
 
     <header>
-        <div>
-            <span style="font-weight: bold; letter-spacing: 2px;">SOVEREIGN // v71.0</span>
-        </div>
+        <div><span style="font-weight: bold; letter-spacing: 2px;">SOVEREIGN // v71.0</span></div>
         <div id="networkStatus" class="status-pill offline">Disconnected</div>
     </header>
 
@@ -158,10 +152,9 @@
             </div>
 
             <div class="card">
-                <div class="balance-label">ETH BALANCE (Native)</div>
+                <div class="balance-label">ETH BALANCE</div>
                 <div id="ethBalance" class="balance-value">0.00</div>
-                
-                <div class="balance-label">WOPN BALANCE (Wrapped)</div>
+                <div class="balance-label">WOPN BALANCE</div>
                 <div id="wopnBalance" class="balance-value">0.00</div>
             </div>
 
@@ -176,42 +169,40 @@
 
         <section class="monitor">
             <div style="font-size: 14px; font-weight: bold; border-left: 3px solid var(--primary); padding-left: 10px;">
-                TRANSACTION KERNEL JOURNAL
+                KERNEL TRANSACTION JOURNAL
             </div>
-            <div id="txJournal" class="card" style="min-height: 300px; padding: 0;">
-                </div>
+            <div id="txJournal" class="card" style="min-height: 300px; padding: 0;"></div>
         </section>
     </main>
 
     <script>
         /**
-         * UI SYNC ADAPTER
-         * Menghubungkan Kernel v71.0 ke DOM
+         * Bagian 1: UI SYNC ADAPTER
+         * Fungsi ini WAJIB ada di scope window agar bisa dipanggil oleh Kernel.
          */
         window.syncSovereignUI = (state) => {
             const { vault, kernel, network } = state;
 
-            // 1. Update Network Status
+            // Update Status Jaringan
             const netPill = document.getElementById('networkStatus');
             netPill.innerText = network.rpcStatus === 'OK' ? `CHAIN ${network.chainId}` : network.rpcStatus;
             netPill.className = `status-pill ${network.connected ? 'online' : 'offline'}`;
 
-            // 2. Update Vault
+            // Update Saldo & Alamat
             document.getElementById('addrDisplay').innerText = vault.address || "Not Connected";
             document.getElementById('ethBalance').innerText = parseFloat(vault.balanceIn).toFixed(4);
             document.getElementById('wopnBalance').innerText = parseFloat(vault.balanceOut).toFixed(4);
 
-            // 3. Update Kernel UI State
+            // Update Status Tombol & Overlay
             const isBusy = kernel.status !== 'IDLE';
             document.getElementById('btnDeposit').disabled = isBusy;
             document.getElementById('btnWithdraw').disabled = isBusy;
             document.getElementById('txAmount').disabled = isBusy;
-            
             document.getElementById('signingOverlay').style.display = kernel.status === 'SIGNING' ? 'flex' : 'none';
 
-            // 4. Render Journal
+            // Render Journal (History)
             const journal = document.getElementById('txJournal');
-            journal.innerHTML = kernel.txQueue.length ? '' : '<div style="padding: 2rem; color: #444; text-align: center;">No transactions found in journal.</div>';
+            journal.innerHTML = kernel.txQueue.length ? '' : '<div style="padding: 2rem; color: #444; text-align: center;">No transaction history.</div>';
             
             kernel.txQueue.forEach(tx => {
                 const item = document.createElement('div');
@@ -232,18 +223,144 @@
         };
 
         /**
-         * ACTION HANDLER
+         * Bagian 2: ACTION HANDLER
          */
         function handleTx(mode) {
-            const amount = document.getElementById('txAmount').value;
             if(!window.KernelDispatcher) return alert("Kernel not loaded!");
-            
-            window.KernelDispatcher.execute('WOPN_ACTION', {
-                mode: mode,
-                amount: amount
-            });
+            const amount = document.getElementById('txAmount').value;
+            window.KernelDispatcher.execute('WOPN_ACTION', { mode, amount });
         }
-    </script>
 
-    </body>
-</html>
+        /**
+         * Bagian 3: SOVEREIGN ENGINE v71.0 (THE KERNEL)
+         */
+        const SovereignEngine = (() => {
+            const _CONFIG = Object.freeze({
+                CHAIN_ID: 2047,
+                RPC: "https://testnet-rpc2.iopn.tech",
+                WOPN: "0x826496be2340356C193566190802777174e929f9",
+                GHOST_TTL: 600000,
+                TX_TIMEOUT: 90000,
+                HEARTBEAT_INTERVAL: 8000,
+                PERSISTENCE_MAX_AGE: 86400000
+            });
+
+            const _INTERNAL = {
+                state: {
+                    vault: { address: null, balanceIn: "0", balanceOut: "0" },
+                    kernel: { status: "IDLE", txQueue: [] },
+                    network: { chainId: null, connected: false, rpcStatus: "OK" }
+                },
+                settlements: new Map(),
+                ghosts: new Map(),
+                provider: null,
+                staticProvider: new ethers.JsonRpcProvider(_CONFIG.RPC),
+                abortController: new AbortController(),
+                lock: false,
+                inflightHydration: false,
+                hydrationScheduled: false,
+                epoch: 0,
+                syncScheduled: false,
+                heartbeatId: null,
+                handlers: { accounts: null, chain: null }
+            };
+
+            const _core = {
+                async getProvider() {
+                    if (!_INTERNAL.provider && window.ethereum) {
+                        _INTERNAL.provider = new ethers.BrowserProvider(window.ethereum);
+                    }
+                    return _INTERNAL.provider;
+                },
+                mutate(updates) {
+                    let changed = false;
+                    updates.forEach(([path, value]) => {
+                        const keys = path.split('.');
+                        let target = _INTERNAL.state;
+                        for (let i = 0; i < keys.length - 1; i++) target = target[keys[i]];
+                        const lastKey = keys[keys.length - 1];
+                        if (target[lastKey] !== value) { target[lastKey] = value; changed = true; }
+                    });
+                    if (changed) { this.triggerSync(); this.persist(); }
+                },
+                triggerSync() {
+                    if (_INTERNAL.syncScheduled || !window.syncSovereignUI) return;
+                    _INTERNAL.syncScheduled = true;
+                    queueMicrotask(() => {
+                        try { window.syncSovereignUI(JSON.parse(JSON.stringify(_INTERNAL.state))); }
+                        finally { _INTERNAL.syncScheduled = false; }
+                    });
+                },
+                persist() {
+                    try {
+                        const now = Date.now();
+                        const settlements = [..._INTERNAL.settlements.entries()]
+                            .filter(([_, v]) => now - v.ts < _CONFIG.PERSISTENCE_MAX_AGE).slice(-50);
+                        localStorage.setItem('SOVEREIGN_JOURNAL', JSON.stringify({ queue: _INTERNAL.state.kernel.txQueue, settlements }));
+                    } catch {}
+                },
+                loadPersistence() {
+                    try {
+                        const raw = localStorage.getItem('SOVEREIGN_JOURNAL');
+                        if (!raw) return;
+                        const parsed = JSON.parse(raw);
+                        _INTERNAL.settlements = new Map(parsed.settlements || []);
+                        this.mutate([['kernel.txQueue', parsed.queue || []]]);
+                    } catch {}
+                }
+            };
+
+            return {
+                async execute(type, payload) {
+                    if (_INTERNAL.lock || _INTERNAL.state.kernel.status !== "IDLE") return;
+                    const amount = payload?.amount?.toString() || "0";
+                    if (isNaN(amount) || parseFloat(amount) <= 0) return;
+                    _INTERNAL.lock = true;
+                    let timeoutId = null;
+
+                    try {
+                        const provider = await _core.getProvider();
+                        const network = await provider.getNetwork();
+                        if (Number(network.chainId) !== _CONFIG.CHAIN_ID) throw new Error("WRONG_NETWORK");
+
+                        const accounts = await provider.send("eth_accounts", []);
+                        if (!accounts?.length) throw new Error("WALLET_DISCONNECTED");
+
+                        const signer = await provider.getSigner();
+                        _core.mutate([['kernel.status', 'SIGNING']]);
+
+                        const contract = new ethers.Contract(_CONFIG.WOPN, ["function deposit() payable", "function withdraw(uint256)"], signer);
+                        const tx = payload.mode === 'DEPOSIT' 
+                            ? await contract.deposit({ value: ethers.parseUnits(amount, 18) }) 
+                            : await contract.withdraw(ethers.parseUnits(amount, 18));
+
+                        _core.mutate([['kernel.status', 'OBSERVING']]);
+                        _INTERNAL.ghosts.set(tx.hash, { ts: Date.now(), type });
+
+                        const receipt = await Promise.race([
+                            tx.wait(1),
+                            new Promise((_, reject) => {
+                                timeoutId = setTimeout(() => reject(new Error("TIMEOUT")), _CONFIG.TX_TIMEOUT);
+                                _INTERNAL.abortController.signal.addEventListener('abort', () => reject(new Error("ABORTED")), { once: true });
+                            })
+                        ]);
+                        if (receipt) this.finalize(receipt.hash, type, "SUCCESS");
+                    } catch (err) {
+                        if (err.message !== "ABORTED") this.finalize(null, type, "FAILED", err.reason || err.message);
+                    } finally {
+                        if (timeoutId) clearTimeout(timeoutId);
+                        _INTERNAL.lock = false;
+                        _core.mutate([['kernel.status', 'IDLE']]);
+                    }
+                },
+                finalize(hash, type, status, error = null) {
+                    const now = Date.now();
+                    if (hash) {
+                        if (_INTERNAL.settlements.get(hash)?.status === "SUCCESS") return;
+                        _INTERNAL.settlements.set(hash, { status, ts: now });
+                    }
+                    _INTERNAL.ghosts.delete(hash);
+                    const entry = { hash, type, status, error, ts: now };
+                    const queue = [entry, ..._INTERNAL.state.kernel.txQueue].filter((v,i,a) => !v.hash || a.findIndex(t => t.hash === v.hash) === i).slice(0, 10);
+                    _core.mutate([['
+        
