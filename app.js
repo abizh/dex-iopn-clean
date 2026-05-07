@@ -256,42 +256,82 @@ window.executeRemoveLiquidity = async (percent) => {
             log("LP Approved ✅");
         }
 
-        // =========================
-        // REMOVE
-        // =========================
-        log("Removing Liquidity...");
+window.executeRemoveLiquidity = async function(percent) {
+    try {
+        log("Menyiapkan penarikan... 🔄");
+        
+        // 1. Inisialisasi Provider & Signer Fresh
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const user = await signer.getAddress();
+        
+        const dex = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, signer);
 
-        const tx = await dex.removeLiquidityMulti(
-            CONFIG.T_IN,
-            CONFIG.T_OUT,
-            percent,
-            false
+        // 2. Ambil Alamat Pool (Penyebab utama missing revert data kalau salah)
+        log("Mencari alamat kolam... 🔍");
+        const poolAddr = await dex.getPool(CONFIG.T_IN, CONFIG.T_OUT);
+        
+        if (!poolAddr || poolAddr === ethers.ZeroAddress) {
+            log("Kolam tidak ditemukan! ❌", true);
+            return;
+        }
+
+        // 3. Cek Saldo LP (Harus ada isinya)
+        const lpToken = new ethers.Contract(poolAddr, ABI_TOKEN, signer);
+        const bal = await lpToken.balanceOf(user);
+        
+        if (bal === 0n) {
+            log("Saldo LP Anda 0. Tidak ada yang bisa ditarik!", true);
+            return;
+        }
+
+        // 4. Hitung Jumlah & MAPPING PERSEN
+        const p = Number(percent);
+        const mapPct = { 1: 25n, 2: 50n, 3: 75n, 4: 100n };
+        const amtToApprove = (bal * mapPct[p]) / 100n;
+
+        // 🛡️ STEP 1: APPROVE LP TOKEN (Wajib Gaya Rabby)
+        // Tanpa ini, pasti muncul "missing revert data" saat execute
+        log(`Izin Tarik ${mapPct[p]}% LP... 🛡️`);
+        try {
+            const txA = await lpToken.approve(CONFIG.BOZZ_ROUTER, amtToApprove);
+            log("Menunggu persetujuan izin... ⏳");
+            await txA.wait();
+            log("Izin diberikan! ✅");
+        } catch (approveErr) {
+            log("Gagal memberikan izin! ❌", true);
+            return;
+        }
+
+        // 🚀 STEP 2: EKSEKUSI REMOVE (Gunakan Gas Limit Manual untuk cegah Revert)
+        log("Konfirmasi penarikan koin... ⏳");
+        const txR = await dex.removeLiquidityMulti(
+            CONFIG.T_IN, 
+            CONFIG.T_OUT, 
+            p, 
+            false, 
+            { gasLimit: 500000 } // Tambahin bensin biar gak sesak napas
         );
-
-        await tx.wait();
-
-        saveTx(
-            `Remove Liq ${percent == 4 ? '100' : percent * 25}%`,
-            tx.hash,
-            "Success"
-        );
-
-        log("Liquidity Removed 💸");
-
+        
+        log("Menunggu konfirmasi blok... ⏳");
+        await txR.wait();
+        
+        const label = mapPct[p].toString() + '%';
+        saveTx(`Remove Liq ${label}`, txR.hash, "Success");
+        log(`Sukses! Modal ${label} sudah balik. 💸`);
         updateBalances();
 
     } catch (err) {
-
-        console.error("REMOVE ERROR:", err);
-
-        log(
-            err.shortMessage ||
-            err.reason ||
-            err.message,
-            true
-        );
+        console.error("ERROR LENGKAP:", err);
+        // Tangani pesan error spesifik
+        if (err.message.includes("user rejected")) {
+            log("Transaksi dibatalkan user. ❌", true);
+        } else {
+            log("❌ missing revert data (Cek Saldo LP)", true);
+        }
     }
-    }
+};
+
         
 document.addEventListener("DOMContentLoaded", () => {
     setupInput();
