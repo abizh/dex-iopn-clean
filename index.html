@@ -1,366 +1,605 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SOVEREIGN KERNEL v71.0</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
-    <style>
-        :root {
-            --bg: #0a0a0a;
-            --surface: #141414;
-            --border: #262626;
-            --primary: #00ff88;
-            --text: #e5e5e5;
-            --dim: #737373;
-            --error: #ff4444;
+<script>
+const SovereignEngine = (() => {
+
+    const CONFIG = Object.freeze({
+        CHAIN_ID: 2047,
+        RPC: "https://testnet-rpc2.iopn.tech",
+        WOPN: "0x826496be2340356C193566190802777174e929f9",
+
+        TX_TIMEOUT: 90000,
+        HEARTBEAT_INTERVAL: 8000,
+        GHOST_TTL: 600000,
+        PERSISTENCE_MAX_AGE: 86400000
+    });
+
+    const INTERNAL = {
+        state: {
+            vault: {
+                address: null,
+                balanceIn: "0",
+                balanceOut: "0"
+            },
+
+            kernel: {
+                status: "IDLE",
+                txQueue: []
+            },
+
+            network: {
+                chainId: null,
+                connected: false,
+                rpcStatus: "OFFLINE"
+            }
+        },
+
+        provider: null,
+        staticProvider: new ethers.JsonRpcProvider(CONFIG.RPC),
+
+        ghosts: new Map(),
+        settlements: new Map(),
+
+        abortController: new AbortController(),
+
+        lock: false,
+
+        inflightHydration: false,
+        hydrationScheduled: false,
+        epoch: 0,
+
+        syncScheduled: false,
+
+        heartbeatId: null,
+
+        handlers: {
+            accounts: null,
+            chain: null
         }
+    };
 
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
+    const core = {
 
-        header {
-            padding: 1rem 2rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--surface);
-        }
+        async getProvider() {
+            if (!window.ethereum) throw new Error("NO_WALLET");
 
-        .status-pill {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            text-transform: uppercase;
-            border: 1px solid var(--border);
-        }
+            if (!INTERNAL.provider) {
+                INTERNAL.provider = new ethers.BrowserProvider(window.ethereum);
+            }
 
-        .online { color: var(--primary); border-color: var(--primary); }
-        .offline { color: var(--error); border-color: var(--error); }
+            return INTERNAL.provider;
+        },
 
-        main {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            flex: 1;
-            overflow: hidden;
-        }
+        mutate(updates) {
 
-        .sidebar {
-            padding: 2rem;
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
+            let changed = false;
 
-        .card {
-            background: var(--surface);
-            padding: 1.5rem;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-        }
+            updates.forEach(([path, value]) => {
 
-        .balance-label { font-size: 12px; color: var(--dim); margin-bottom: 4px; }
-        .balance-value { font-size: 24px; font-weight: 600; margin-bottom: 1rem; }
+                const keys = path.split('.');
 
-        input {
-            width: 100%;
-            padding: 12px;
-            background: #000;
-            border: 1px solid var(--border);
-            color: #fff;
-            border-radius: 4px;
-            margin-bottom: 1rem;
-            box-sizing: border-box;
-        }
+                let target = INTERNAL.state;
 
-        button {
-            width: 100%;
-            padding: 12px;
-            background: var(--primary);
-            color: #000;
-            border: none;
-            border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
+                for (let i = 0; i < keys.length - 1; i++) {
+                    target = target[keys[i]];
+                }
 
-        button:disabled { opacity: 0.3; cursor: not-allowed; }
+                const last = keys[keys.length - 1];
 
-        .monitor {
-            padding: 2rem;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .tx-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px;
-            border-bottom: 1px solid var(--border);
-            font-family: 'Cascadia Code', monospace;
-            font-size: 13px;
-        }
-
-        .hash-link { color: var(--primary); text-decoration: none; font-size: 11px; }
-        .tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #333; }
-
-        .signing-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            backdrop-filter: blur(4px);
-        }
-    </style>
-</head>
-<body>
-
-    <div id="signingOverlay" class="signing-overlay">
-        <div class="card" style="text-align: center;">
-            <div style="margin-bottom: 1rem; color: var(--primary);">⚡ KERNEL AWAITING SIGNATURE</div>
-            <div style="font-size: 12px; color: var(--dim);">Silakan cek MetaMask / Wallet kamu...</div>
-        </div>
-    </div>
-
-    <header>
-        <div><span style="font-weight: bold; letter-spacing: 2px;">SOVEREIGN // v71.0</span></div>
-        <div id="networkStatus" class="status-pill offline">Disconnected</div>
-    </header>
-
-    <main>
-        <section class="sidebar">
-            <div class="card">
-                <div class="balance-label">WALLET ADDRESS</div>
-                <div id="addrDisplay" style="font-size: 11px; color: var(--primary); word-break: break-all;">Not Connected</div>
-            </div>
-
-            <div class="card">
-                <div class="balance-label">ETH BALANCE</div>
-                <div id="ethBalance" class="balance-value">0.00</div>
-                <div class="balance-label">WOPN BALANCE</div>
-                <div id="wopnBalance" class="balance-value">0.00</div>
-            </div>
-
-            <div class="card">
-                <input type="number" id="txAmount" placeholder="0.00" step="0.01">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button id="btnDeposit" onclick="handleTx('DEPOSIT')">DEPOSIT</button>
-                    <button id="btnWithdraw" onclick="handleTx('WITHDRAW')" style="background: transparent; color: var(--primary); border: 1px solid var(--primary);">WITHDRAW</button>
-                </div>
-            </div>
-        </section>
-
-        <section class="monitor">
-            <div style="font-size: 14px; font-weight: bold; border-left: 3px solid var(--primary); padding-left: 10px;">
-                KERNEL TRANSACTION JOURNAL
-            </div>
-            <div id="txJournal" class="card" style="min-height: 300px; padding: 0;"></div>
-        </section>
-    </main>
-
-    <script>
-        /**
-         * Bagian 1: UI SYNC ADAPTER
-         * Fungsi ini WAJIB ada di scope window agar bisa dipanggil oleh Kernel.
-         */
-        window.syncSovereignUI = (state) => {
-            const { vault, kernel, network } = state;
-
-            // Update Status Jaringan
-            const netPill = document.getElementById('networkStatus');
-            netPill.innerText = network.rpcStatus === 'OK' ? `CHAIN ${network.chainId}` : network.rpcStatus;
-            netPill.className = `status-pill ${network.connected ? 'online' : 'offline'}`;
-
-            // Update Saldo & Alamat
-            document.getElementById('addrDisplay').innerText = vault.address || "Not Connected";
-            document.getElementById('ethBalance').innerText = parseFloat(vault.balanceIn).toFixed(4);
-            document.getElementById('wopnBalance').innerText = parseFloat(vault.balanceOut).toFixed(4);
-
-            // Update Status Tombol & Overlay
-            const isBusy = kernel.status !== 'IDLE';
-            document.getElementById('btnDeposit').disabled = isBusy;
-            document.getElementById('btnWithdraw').disabled = isBusy;
-            document.getElementById('txAmount').disabled = isBusy;
-            document.getElementById('signingOverlay').style.display = kernel.status === 'SIGNING' ? 'flex' : 'none';
-
-            // Render Journal (History)
-            const journal = document.getElementById('txJournal');
-            journal.innerHTML = kernel.txQueue.length ? '' : '<div style="padding: 2rem; color: #444; text-align: center;">No transaction history.</div>';
-            
-            kernel.txQueue.forEach(tx => {
-                const item = document.createElement('div');
-                item.className = 'tx-item';
-                const statusColor = tx.status === 'SUCCESS' ? 'var(--primary)' : (tx.status === 'FAILED' ? 'var(--error)' : '#ffaa00');
-                
-                item.innerHTML = `
-                    <div>
-                        <span class="tag">${tx.type}</span>
-                        <span style="color: ${statusColor}; margin-left: 8px;">● ${tx.status}</span>
-                        <br/>
-                        ${tx.hash ? `<a href="https://testnet.iopn.tech/tx/${tx.hash}" target="_blank" class="hash-link">${tx.hash.substring(0, 16)}...</a>` : `<span style="font-size: 10px; color: var(--dim);">${tx.error || 'No hash'}</span>`}
-                    </div>
-                    <div style="color: var(--dim); font-size: 10px;">${new Date(tx.ts).toLocaleTimeString()}</div>
-                `;
-                journal.appendChild(item);
-            });
-        };
-
-        /**
-         * Bagian 2: ACTION HANDLER
-         */
-        function handleTx(mode) {
-            if(!window.KernelDispatcher) return alert("Kernel not loaded!");
-            const amount = document.getElementById('txAmount').value;
-            window.KernelDispatcher.execute('WOPN_ACTION', { mode, amount });
-        }
-
-        /**
-         * Bagian 3: SOVEREIGN ENGINE v71.0 (THE KERNEL)
-         */
-        const SovereignEngine = (() => {
-            const _CONFIG = Object.freeze({
-                CHAIN_ID: 2047,
-                RPC: "https://testnet-rpc2.iopn.tech",
-                WOPN: "0x826496be2340356C193566190802777174e929f9",
-                GHOST_TTL: 600000,
-                TX_TIMEOUT: 90000,
-                HEARTBEAT_INTERVAL: 8000,
-                PERSISTENCE_MAX_AGE: 86400000
+                if (target[last] !== value) {
+                    target[last] = value;
+                    changed = true;
+                }
             });
 
-            const _INTERNAL = {
-                state: {
-                    vault: { address: null, balanceIn: "0", balanceOut: "0" },
-                    kernel: { status: "IDLE", txQueue: [] },
-                    network: { chainId: null, connected: false, rpcStatus: "OK" }
-                },
-                settlements: new Map(),
-                ghosts: new Map(),
-                provider: null,
-                staticProvider: new ethers.JsonRpcProvider(_CONFIG.RPC),
-                abortController: new AbortController(),
-                lock: false,
-                inflightHydration: false,
-                hydrationScheduled: false,
-                epoch: 0,
-                syncScheduled: false,
-                heartbeatId: null,
-                handlers: { accounts: null, chain: null }
+            if (changed) {
+                this.sync();
+                this.persist();
+            }
+        },
+
+        sync() {
+
+            if (INTERNAL.syncScheduled) return;
+
+            INTERNAL.syncScheduled = true;
+
+            queueMicrotask(() => {
+
+                try {
+
+                    if (window.syncSovereignUI) {
+
+                        const snapshot =
+                            window.structuredClone
+                                ? structuredClone(INTERNAL.state)
+                                : JSON.parse(JSON.stringify(INTERNAL.state));
+
+                        window.syncSovereignUI(snapshot);
+                    }
+
+                } finally {
+                    INTERNAL.syncScheduled = false;
+                }
+            });
+        },
+
+        persist() {
+
+            try {
+
+                const now = Date.now();
+
+                const settlements =
+                    [...INTERNAL.settlements.entries()]
+                        .filter(([_, v]) =>
+                            now - v.ts < CONFIG.PERSISTENCE_MAX_AGE
+                        )
+                        .slice(-50);
+
+                localStorage.setItem(
+                    "SOVEREIGN_JOURNAL",
+                    JSON.stringify({
+                        queue: INTERNAL.state.kernel.txQueue,
+                        settlements
+                    })
+                );
+
+            } catch {}
+        },
+
+        loadPersistence() {
+
+            try {
+
+                const raw =
+                    localStorage.getItem("SOVEREIGN_JOURNAL");
+
+                if (!raw) return;
+
+                const parsed = JSON.parse(raw);
+
+                INTERNAL.settlements =
+                    new Map(parsed.settlements || []);
+
+                INTERNAL.state.kernel.txQueue =
+                    parsed.queue || [];
+
+            } catch {}
+        }
+    };
+
+    return {
+
+        async execute(type, payload) {
+
+            if (
+                INTERNAL.lock ||
+                INTERNAL.state.kernel.status !== "IDLE"
+            ) return;
+
+            const amount =
+                payload?.amount?.toString() || "0";
+
+            if (
+                isNaN(amount) ||
+                parseFloat(amount) <= 0
+            ) {
+                return;
+            }
+
+            INTERNAL.lock = true;
+
+            let timeoutId = null;
+
+            const abortHandler = () => {
+                throw new Error("ABORTED");
             };
 
-            const _core = {
-                async getProvider() {
-                    if (!_INTERNAL.provider && window.ethereum) {
-                        _INTERNAL.provider = new ethers.BrowserProvider(window.ethereum);
-                    }
-                    return _INTERNAL.provider;
-                },
-                mutate(updates) {
-                    let changed = false;
-                    updates.forEach(([path, value]) => {
-                        const keys = path.split('.');
-                        let target = _INTERNAL.state;
-                        for (let i = 0; i < keys.length - 1; i++) target = target[keys[i]];
-                        const lastKey = keys[keys.length - 1];
-                        if (target[lastKey] !== value) { target[lastKey] = value; changed = true; }
+            try {
+
+                const provider =
+                    await core.getProvider();
+
+                const network =
+                    await provider.getNetwork();
+
+                if (
+                    Number(network.chainId) !== CONFIG.CHAIN_ID
+                ) {
+                    throw new Error("WRONG_NETWORK");
+                }
+
+                const signer =
+                    await provider.getSigner();
+
+                core.mutate([
+                    ['kernel.status', 'SIGNING']
+                ]);
+
+                const contract =
+                    new ethers.Contract(
+                        CONFIG.WOPN,
+                        [
+                            "function deposit() payable",
+                            "function withdraw(uint256)"
+                        ],
+                        signer
+                    );
+
+                const parsed =
+                    ethers.parseUnits(amount, 18);
+
+                const tx =
+                    payload.mode === "DEPOSIT"
+                        ? await contract.deposit({ value: parsed })
+                        : await contract.withdraw(parsed);
+
+                core.mutate([
+                    ['kernel.status', 'OBSERVING']
+                ]);
+
+                INTERNAL.ghosts.set(tx.hash, {
+                    ts: Date.now(),
+                    type
+                });
+
+                const abortPromise =
+                    new Promise((_, reject) => {
+
+                        INTERNAL.abortController.signal
+                            .addEventListener(
+                                'abort',
+                                () => reject(new Error("ABORTED")),
+                                { once: true }
+                            );
+
+                        timeoutId = setTimeout(() => {
+                            reject(new Error("TIMEOUT"));
+                        }, CONFIG.TX_TIMEOUT);
                     });
-                    if (changed) { this.triggerSync(); this.persist(); }
-                },
-                triggerSync() {
-                    if (_INTERNAL.syncScheduled || !window.syncSovereignUI) return;
-                    _INTERNAL.syncScheduled = true;
-                    queueMicrotask(() => {
-                        try { window.syncSovereignUI(JSON.parse(JSON.stringify(_INTERNAL.state))); }
-                        finally { _INTERNAL.syncScheduled = false; }
-                    });
-                },
-                persist() {
-                    try {
-                        const now = Date.now();
-                        const settlements = [..._INTERNAL.settlements.entries()]
-                            .filter(([_, v]) => now - v.ts < _CONFIG.PERSISTENCE_MAX_AGE).slice(-50);
-                        localStorage.setItem('SOVEREIGN_JOURNAL', JSON.stringify({ queue: _INTERNAL.state.kernel.txQueue, settlements }));
-                    } catch {}
-                },
-                loadPersistence() {
-                    try {
-                        const raw = localStorage.getItem('SOVEREIGN_JOURNAL');
-                        if (!raw) return;
-                        const parsed = JSON.parse(raw);
-                        _INTERNAL.settlements = new Map(parsed.settlements || []);
-                        this.mutate([['kernel.txQueue', parsed.queue || []]]);
-                    } catch {}
+
+                const receipt =
+                    await Promise.race([
+                        tx.wait(1),
+                        abortPromise
+                    ]);
+
+                if (receipt) {
+                    this.finalize(
+                        receipt.hash,
+                        type,
+                        "SUCCESS"
+                    );
+                }
+
+            } catch (err) {
+
+                if (err.message !== "ABORTED") {
+
+                    this.finalize(
+                        null,
+                        type,
+                        "FAILED",
+                        err.reason || err.message
+                    );
+                }
+
+            } finally {
+
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                }
+
+                INTERNAL.lock = false;
+
+                core.mutate([
+                    ['kernel.status', 'IDLE']
+                ]);
+            }
+        },
+
+        finalize(hash, type, status, error = null) {
+
+            const now = Date.now();
+
+            if (hash) {
+
+                const existing =
+                    INTERNAL.settlements.get(hash);
+
+                if (existing?.status === "SUCCESS") {
+                    INTERNAL.ghosts.delete(hash);
+                    return;
+                }
+
+                INTERNAL.settlements.set(hash, {
+                    status,
+                    ts: now
+                });
+            }
+
+            INTERNAL.ghosts.delete(hash);
+
+            const entry = {
+                hash,
+                type,
+                status,
+                error,
+                ts: now
+            };
+
+            const queue =
+                [
+                    entry,
+                    ...INTERNAL.state.kernel.txQueue
+                ]
+                .filter((v, i, arr) =>
+                    !v.hash ||
+                    arr.findIndex(t => t.hash === v.hash) === i
+                )
+                .slice(0, 10);
+
+            core.mutate([
+                ['kernel.txQueue', queue]
+            ]);
+
+            this.scheduleHydrate();
+        },
+
+        scheduleHydrate() {
+
+            if (INTERNAL.hydrationScheduled) return;
+
+            INTERNAL.hydrationScheduled = true;
+
+            queueMicrotask(() => {
+
+                INTERNAL.hydrationScheduled = false;
+
+                this.hydrate();
+            });
+        },
+
+        async hydrate() {
+
+            const address =
+                INTERNAL.state.vault.address;
+
+            if (
+                !address ||
+                INTERNAL.inflightHydration
+            ) return;
+
+            INTERNAL.inflightHydration = true;
+
+            const snapshot = address;
+
+            const epoch = ++INTERNAL.epoch;
+
+            try {
+
+                const started = Date.now();
+
+                const token =
+                    new ethers.Contract(
+                        CONFIG.WOPN,
+                        [
+                            "function balanceOf(address) view returns (uint256)"
+                        ],
+                        INTERNAL.staticProvider
+                    );
+
+                const [eth, wopn] =
+                    await Promise.all([
+                        INTERNAL.staticProvider.getBalance(snapshot),
+                        token.balanceOf(snapshot)
+                    ]);
+
+                if (
+                    epoch === INTERNAL.epoch &&
+                    snapshot === INTERNAL.state.vault.address
+                ) {
+
+                    core.mutate([
+                        ['vault.balanceIn', ethers.formatEther(eth)],
+                        ['vault.balanceOut', ethers.formatEther(wopn)],
+                        ['network.rpcStatus',
+                            Date.now() - started > 5000
+                                ? 'STALE'
+                                : 'OK'
+                        ]
+                    ]);
+                }
+
+            } catch {
+
+                core.mutate([
+                    ['network.rpcStatus', 'DEGRADED']
+                ]);
+
+            } finally {
+
+                INTERNAL.inflightHydration = false;
+            }
+        },
+
+        startHeartbeat() {
+
+            if (INTERNAL.heartbeatId) return;
+
+            INTERNAL.heartbeatId = setInterval(async () => {
+
+                if (INTERNAL.ghosts.size === 0) return;
+
+                const now = Date.now();
+
+                const jobs =
+                    [...INTERNAL.ghosts.entries()]
+                        .map(async ([hash, meta]) => {
+
+                            if (
+                                now - meta.ts >
+                                CONFIG.GHOST_TTL
+                            ) {
+                                INTERNAL.ghosts.delete(hash);
+                                return;
+                            }
+
+                            try {
+
+                                const receipt =
+                                    await INTERNAL.staticProvider
+                                        .getTransactionReceipt(hash);
+
+                                if (receipt) {
+                                    this.finalize(
+                                        hash,
+                                        meta.type,
+                                        "SUCCESS"
+                                    );
+                                }
+
+                            } catch {}
+                        });
+
+                await Promise.allSettled(jobs);
+
+            }, CONFIG.HEARTBEAT_INTERVAL);
+        },
+
+        async boot() {
+
+            if (
+                window.__SOVEREIGN_LOADED__
+            ) return;
+
+            core.loadPersistence();
+
+            INTERNAL.handlers.accounts = (accounts) => {
+
+                const addr =
+                    accounts[0] || null;
+
+                core.mutate([
+                    ['vault.address', addr],
+                    ['vault.balanceIn', '0'],
+                    ['vault.balanceOut', '0'],
+                    ['network.connected', !!addr]
+                ]);
+
+                if (addr) {
+                    this.scheduleHydrate();
                 }
             };
 
-            return {
-                async execute(type, payload) {
-                    if (_INTERNAL.lock || _INTERNAL.state.kernel.status !== "IDLE") return;
-                    const amount = payload?.amount?.toString() || "0";
-                    if (isNaN(amount) || parseFloat(amount) <= 0) return;
-                    _INTERNAL.lock = true;
-                    let timeoutId = null;
+            INTERNAL.handlers.chain = (hex) => {
 
-                    try {
-                        const provider = await _core.getProvider();
-                        const network = await provider.getNetwork();
-                        if (Number(network.chainId) !== _CONFIG.CHAIN_ID) throw new Error("WRONG_NETWORK");
+                const chainId =
+                    parseInt(hex, 16);
 
-                        const accounts = await provider.send("eth_accounts", []);
-                        if (!accounts?.length) throw new Error("WALLET_DISCONNECTED");
+                INTERNAL.provider = null;
 
-                        const signer = await provider.getSigner();
-                        _core.mutate([['kernel.status', 'SIGNING']]);
+                INTERNAL.ghosts.clear();
 
-                        const contract = new ethers.Contract(_CONFIG.WOPN, ["function deposit() payable", "function withdraw(uint256)"], signer);
-                        const tx = payload.mode === 'DEPOSIT' 
-                            ? await contract.deposit({ value: ethers.parseUnits(amount, 18) }) 
-                            : await contract.withdraw(ethers.parseUnits(amount, 18));
+                INTERNAL.abortController.abort();
 
-                        _core.mutate([['kernel.status', 'OBSERVING']]);
-                        _INTERNAL.ghosts.set(tx.hash, { ts: Date.now(), type });
+                INTERNAL.abortController =
+                    new AbortController();
 
-                        const receipt = await Promise.race([
-                            tx.wait(1),
-                            new Promise((_, reject) => {
-                                timeoutId = setTimeout(() => reject(new Error("TIMEOUT")), _CONFIG.TX_TIMEOUT);
-                                _INTERNAL.abortController.signal.addEventListener('abort', () => reject(new Error("ABORTED")), { once: true });
-                            })
-                        ]);
-                        if (receipt) this.finalize(receipt.hash, type, "SUCCESS");
-                    } catch (err) {
-                        if (err.message !== "ABORTED") this.finalize(null, type, "FAILED", err.reason || err.message);
-                    } finally {
-                        if (timeoutId) clearTimeout(timeoutId);
-                        _INTERNAL.lock = false;
-                        _core.mutate([['kernel.status', 'IDLE']]);
-                    }
-                },
-                finalize(hash, type, status, error = null) {
-                    const now = Date.now();
-                    if (hash) {
-                        if (_INTERNAL.settlements.get(hash)?.status === "SUCCESS") return;
-                        _INTERNAL.settlements.set(hash, { status, ts: now });
-                    }
-                    _INTERNAL.ghosts.delete(hash);
-                    const entry = { hash, type, status, error, ts: now };
-                    const queue = [entry, ..._INTERNAL.state.kernel.txQueue].filter((v,i,a) => !v.hash || a.findIndex(t => t.hash === v.hash) === i).slice(0, 10);
-                    _core.mutate([['
-        
+                core.mutate([
+                    ['network.chainId', chainId],
+                    [
+                        'network.rpcStatus',
+                        chainId === CONFIG.CHAIN_ID
+                            ? 'OK'
+                            : 'WRONG_NETWORK'
+                    ]
+                ]);
+
+                if (
+                    chainId === CONFIG.CHAIN_ID
+                ) {
+                    this.scheduleHydrate();
+                }
+            };
+
+            try {
+
+                const eth = window.ethereum;
+
+                const [accounts, chain] =
+                    await Promise.all([
+                        eth.request({
+                            method: 'eth_accounts'
+                        }),
+                        eth.request({
+                            method: 'eth_chainId'
+                        })
+                    ]);
+
+                INTERNAL.handlers.accounts(accounts);
+                INTERNAL.handlers.chain(chain);
+
+                eth.on(
+                    'accountsChanged',
+                    INTERNAL.handlers.accounts
+                );
+
+                eth.on(
+                    'chainChanged',
+                    INTERNAL.handlers.chain
+                );
+
+                this.startHeartbeat();
+
+                core.sync();
+
+                window.__SOVEREIGN_LOADED__ = true;
+
+                console.log(
+                    "%c SOVEREIGN MASTER ACTIVE ",
+                    "background:#000;color:#00ff88;font-weight:bold;"
+                );
+
+            } catch (e) {
+
+                console.error("BOOT_FAIL", e);
+            }
+        },
+
+        unmount() {
+
+            const eth = window.ethereum;
+
+            if (eth) {
+
+                eth.removeListener(
+                    'accountsChanged',
+                    INTERNAL.handlers.accounts
+                );
+
+                eth.removeListener(
+                    'chainChanged',
+                    INTERNAL.handlers.chain
+                );
+            }
+
+            if (INTERNAL.heartbeatId) {
+                clearInterval(INTERNAL.heartbeatId);
+            }
+
+            INTERNAL.abortController.abort();
+
+            INTERNAL.provider = null;
+
+            INTERNAL.ghosts.clear();
+
+            window.__SOVEREIGN_LOADED__ = false;
+        }
+    };
+
+})();
+
+window.KernelDispatcher = SovereignEngine;
+
+SovereignEngine.boot();
+    </script>
