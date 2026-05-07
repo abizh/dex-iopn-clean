@@ -1,149 +1,204 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOZZDEX V3.5 FINAL</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.12.1/ethers.umd.min.js"></script>
+    <title>Sovereign Sentinel v46.0 | Command Center</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
     <style>
-        :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #c9d1d9; --accent: #238636; --blue: #58a6ff; --red: #da3633; }
-        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .dex-card { background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 16px; width: 90%; max-width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
-        
-        /* Tab Utama Navigation */
-        .tabs { display: flex; gap: 15px; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-        .tab-btn { background: none; border: none; color: #8b949e; cursor: pointer; font-weight: bold; font-size: 16px; padding: 5px 10px; transition: 0.3s; }
-        .tab-btn.active { color: var(--blue); border-bottom: 2px solid var(--blue); }
+        :root {
+            --bg: #0a0a0c;
+            --surface: #16161a;
+            --primary: #00ff88;
+            --warning: #ffcc00;
+            --danger: #ff4444;
+            --text: #e0e0e0;
+        }
 
-        /* Sub-Tab Liquidity (Add / Remove) */
-        .sub-tabs { display: flex; background: var(--bg); border-radius: 8px; padding: 4px; margin: 10px 0 15px 0; border: 1px solid var(--border); }
-        .sub-tab-btn { flex: 1; background: none; border: none; color: #8b949e; padding: 8px; cursor: pointer; font-size: 13px; border-radius: 6px; font-weight: bold; transition: 0.2s; }
-        .sub-tab-btn.active { background: var(--border); color: #fff; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 15px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
 
-        .input-box { background: var(--bg); padding: 12px; border-radius: 12px; border: 1px solid var(--border); margin: 8px 0; }
-        .input-box input { background: transparent; border: none; color: #fff; font-size: 18px; width: 100%; outline: none; }
-        
-        .btn-connect { width: 100%; padding: 10px; border-radius: 10px; background: #21262d; color: #fff; border: 1px solid var(--border); cursor: pointer; margin-bottom: 15px; font-size: 12px; }
-        .btn-action { width: 100%; padding: 14px; border-radius: 10px; background: var(--accent); color: #fff; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .btn-action:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
-        
-        .label-row { display: flex; justify-content: space-between; font-size: 11px; color: #8b949e; margin-bottom: 4px; }
-        .grid-percent { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
-        .btn-opt { background: #21262d; border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 12px; }
-        .btn-opt:hover { background: var(--border); }
-        
-        #statusLog { font-size: 10px; margin-top: 15px; color: #7ee787; min-height: 12px; text-align: center; }
-        
-        /* History Style ala CEX */
-        #txList { display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto; margin-top: 10px; }
-        #txList::-webkit-scrollbar { width: 4px; }
-        #txList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-        
-        .hidden { display: none; }
+        /* --- LEDGER STATUS CARD --- */
+        .status-card {
+            background: var(--surface);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .badge-live { background: var(--primary); color: #000; }
+        .badge-dead { background: #444; color: #ccc; }
+
+        /* --- ACTION BUTTONS --- */
+        .btn-action {
+            display: block;
+            width: 100%;
+            background: var(--primary);
+            color: #000;
+            border: none;
+            padding: 15px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        .btn-action:active { transform: scale(0.98); }
+        .btn-action:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* --- FORENSIC LOGS (The Heart) --- */
+        #log-container {
+            background: #000;
+            border: 1px solid #444;
+            border-radius: 6px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 10px;
+            font-size: 12px;
+            color: #00ff44;
+        }
+
+        .log-entry { margin-bottom: 4px; border-left: 2px solid #333; padding-left: 8px; }
+        .log-error { color: var(--danger); }
+        .log-warn { color: var(--warning); }
+        .log-success { color: var(--primary); }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+
+        .meta-item {
+            background: rgba(255,255,255,0.05);
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .label { color: #888; display: block; margin-bottom: 2px; }
     </style>
 </head>
 <body>
-    <div class="dex-card">
-        <button id="btnConnect" class="btn-connect">Hubungkan Dompet</button>
+
+    <div class="status-card">
+        <div class="status-header">
+            <strong>SENTINEL KERNEL v46.0</strong>
+            <span id="runtime-status" class="badge badge-dead">Idle</span>
+        </div>
         
-        <div class="tabs">
-            <button id="tabSwap" class="tab-btn active" onclick="switchMainTab('swap')">Swap</button>
-            <button id="tabLiq" class="tab-btn" onclick="switchMainTab('liquidity')">Liquidity</button>
-        </div>
-
-        <div id="swap-section">
-            <div class="input-box">
-                <div class="label-row"><span>JUAL (WOPN)</span><span id="balIn">Saldo: 0.0</span></div>
-                <input type="text" id="inputAmount" inputmode="decimal" placeholder="0.0">
+        <div class="meta-grid">
+            <div class="meta-item">
+                <span class="label">CURRENT EPOCH</span>
+                <span id="display-epoch">NONE</span>
             </div>
-            <div style="text-align:center; color:var(--blue); margin: -5px 0; font-weight: bold;">↓</div>
-            <div class="input-box">
-                <div class="label-row"><span>TERIMA (OPNT)</span><span id="balOut">Saldo: 0.0</span></div>
-                <input type="text" id="outputAmount" placeholder="0.0" readonly>
+            <div class="meta-item">
+                <span class="label">LEASE OWNER</span>
+                <span id="display-lease">VACANT</span>
             </div>
-            <button id="btnSwap" class="btn-action" disabled>SWAP SEKARANG</button>
-        </div>
-
-        <div id="liq-section" class="hidden">
-            <div class="sub-tabs">
-                <button id="subTabAdd" class="sub-tab-btn active" onclick="switchSubTab('add')">Add</button>
-                <button id="subTabRemove" class="sub-tab-btn" onclick="switchSubTab('remove')">Remove</button>
+            <div class="meta-item">
+                <span class="label">PENDING NONCE</span>
+                <span id="display-nonce">---</span>
             </div>
-
-            <div id="add-liq-content">
-                <div class="input-box">
-                    <div class="label-row"><span>WOPN Amount</span></div>
-                    <input type="text" id="inputAmtA" inputmode="decimal" placeholder="0.0">
-                </div>
-                <div class="input-box">
-                    <div class="label-row"><span>OPNT Amount</span></div>
-                    <input type="text" id="inputAmtB" inputmode="decimal" placeholder="0.0">
-                </div>
-                <button id="btnLiquidity" class="btn-action" disabled>TAMBAH LIKUIDITAS</button>
-            </div>
-
-            <div id="remove-liq-content" class="hidden">
-                <div class="label-row"><span>Jumlah Penarikan (%)</span></div>
-                <div class="grid-percent">
-                    <button class="btn-opt" onclick="executeRemoveLiquidity(1)">25%</button>
-                    <button class="btn-opt" onclick="executeRemoveLiquidity(2)">50%</button>
-                    <button class="btn-opt" onclick="executeRemoveLiquidity(3)">75%</button>
-                    <button class="btn-opt" onclick="executeRemoveLiquidity(4)">100%</button>
-                </div>
+            <div class="meta-item">
+                <span class="label">LEDGER PAGES</span>
+                <span id="display-pages">0</span>
             </div>
         </div>
 
-        <div id="marketPrice" style="font-size:12px; color:var(--blue); margin-top:15px; border-top: 1px solid var(--border); padding-top: 10px;"></div>
-        <div id="statusLog"></div>
-
-        <div id="history-section" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;">
-            <div class="label-row">
-                <span style="font-weight: bold; color: var(--text);">Recent History</span>
-                <span id="btnClearHistory" onclick="clearHistory()" style="cursor: pointer; color: var(--red);">Clear</span>
-            </div>
-            <div id="txList">
-                <div style="text-align: center; font-size: 10px; color: #484f58; padding: 10px;">No history found</div>
-            </div>
-        </div>
+        <button id="btn-remove-liq" class="btn-action" onclick="handleRemoveLiquidity()">
+            EXECUTE REMOVE LIQUIDITY
+        </button>
     </div>
 
+    <div style="margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #888;">
+        LIVE FORENSIC REPLAY ENGINE:
+    </div>
+    <div id="log-container">
+        <div class="log-entry">> Sentinel initialised. Waiting for intent...</div>
+    </div>
+
+    <script src="app.js"></script>
+
     <script>
-        function switchMainTab(tab) {
-            const swapSec = document.getElementById('swap-section');
-            const liqSec = document.getElementById('liq-section');
-            const tabSwap = document.getElementById('tabSwap');
-            const tabLiq = document.getElementById('tabLiq');
-            if (tab === 'swap') {
-                swapSec.classList.remove('hidden');
-                liqSec.classList.add('hidden');
-                tabSwap.classList.add('active');
-                tabLiq.classList.remove('active');
-            } else {
-                swapSec.classList.add('hidden');
-                liqSec.classList.remove('hidden');
-                tabSwap.classList.remove('active');
-                tabLiq.classList.add('active');
+        // UI BRIDGE: Menghubungkan visual dengan internal app.js
+        const logContainer = document.getElementById('log-container');
+        
+        // Custom Logger untuk Forensic View
+        window.forensicUI = {
+            log: (msg, type = '') => {
+                const div = document.createElement('div');
+                div.className = `log-entry ${type ? 'log-'+type : ''}`;
+                const time = new Date().toLocaleTimeString();
+                div.innerHTML = `<span style="color:#666">[${time}]</span> ${msg}`;
+                logContainer.prepend(div);
+            },
+            updateMetadata: (data) => {
+                if (data.epoch) document.getElementById('display-epoch').innerText = data.epoch.substring(0, 15) + '...';
+                if (data.lease) document.getElementById('display-lease').innerText = data.lease.substring(0, 8);
+                if (data.status) {
+                    const el = document.getElementById('runtime-status');
+                    el.innerText = data.status;
+                    el.className = `badge badge-${data.status === 'LIVE' ? 'live' : 'dead'}`;
+                }
+                if (data.pages) document.getElementById('display-pages').innerText = data.pages;
+                if (data.nonce) document.getElementById('display-nonce').innerText = data.nonce;
+            }
+        };
+
+        // Handler tombol yang aman
+        async function handleRemoveLiquidity() {
+            const btn = document.getElementById('btn-remove-liq');
+            btn.disabled = true;
+            
+            try {
+                // Panggil kernel app.js
+                await window.executeRemoveLiquidity(0); 
+            } catch (e) {
+                window.forensicUI.log("UI_CRITICAL_FAULT: " + e.message, 'error');
+            } finally {
+                btn.disabled = false;
             }
         }
 
-        function switchSubTab(sub) {
-            const addContent = document.getElementById('add-liq-content');
-            const removeContent = document.getElementById('remove-liq-content');
-            const subTabAdd = document.getElementById('subTabAdd');
-            const subTabRemove = document.getElementById('subTabRemove');
-            if (sub === 'add') {
-                addContent.classList.remove('hidden');
-                removeContent.classList.add('hidden');
-                subTabAdd.classList.add('active');
-                subTabRemove.classList.remove('active');
-            } else {
-                addContent.classList.add('hidden');
-                removeContent.classList.remove('hidden');
-                subTabAdd.classList.remove('active');
-                subTabRemove.classList.add('active');
-            }
-        }
+        // Auto-refresh metadata untuk observasi lease & ledger
+        setInterval(() => {
+            const lock = JSON.parse(localStorage.getItem('bozz_global_lock') || '{}');
+            window.forensicUI.updateMetadata({
+                lease: lock.token || 'VACANT',
+                status: lock.token ? 'LIVE' : 'IDLE'
+            });
+        }, 1000);
     </script>
-    <script src="app.js"></script>
 </body>
-</html>
+                </html>
+                
