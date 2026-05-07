@@ -1,294 +1,249 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOZZDEX | Unified Sentinel v46.0</title>
-    
-    <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOVEREIGN KERNEL v71.0</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         :root {
-            --bg: #0d1117;
-            --card: #161b22;
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --border: #262626;
             --primary: #00ff88;
-            --accent: #58a6ff;
-            --danger: #ff4444;
-            --text: #c9d1d9;
-            --border: #30363d;
+            --text: #e5e5e5;
+            --dim: #737373;
+            --error: #ff4444;
         }
-
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             background: var(--bg);
             color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            font-family: 'Segoe UI', Roboto, sans-serif;
             margin: 0;
-            padding: 10px;
-            font-size: 14px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
         }
 
-        .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 12px;
-        }
-
-        .header-box {
+        /* HEADER & STATUS BAR */
+        header {
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            background: var(--surface);
         }
 
         .status-pill {
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 10px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: bold;
-            background: #21262d;
+            text-transform: uppercase;
             border: 1px solid var(--border);
         }
 
-        .status-online { color: var(--primary); border-color: var(--primary); box-shadow: 0 0 8px rgba(0,255,136,0.2); }
+        .online { color: var(--primary); border-color: var(--primary); }
+        .offline { color: var(--error); border-color: var(--error); }
 
-        .input-group { margin-bottom: 12px; }
-        label { display: flex; justify-content: space-between; font-size: 11px; color: #8b949e; margin-bottom: 5px; }
-        
+        /* MAIN LAYOUT */
+        main {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR: VAULT & ACTIONS */
+        .sidebar {
+            padding: 2rem;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--surface);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .balance-label { font-size: 12px; color: var(--dim); margin-bottom: 4px; }
+        .balance-value { font-size: 24px; font-weight: 600; margin-bottom: 1rem; }
+
         input {
             width: 100%;
-            background: #0d1117;
-            border: 1px solid var(--border);
             padding: 12px;
-            border-radius: 8px;
+            background: #000;
+            border: 1px solid var(--border);
             color: #fff;
-            font-size: 16px;
-            font-family: 'Courier New', monospace;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            box-sizing: border-box;
         }
 
-        .btn {
+        button {
             width: 100%;
-            padding: 14px;
-            border-radius: 8px;
+            padding: 12px;
+            background: var(--primary);
+            color: #000;
             border: none;
+            border-radius: 4px;
             font-weight: bold;
             cursor: pointer;
-            text-transform: uppercase;
-            transition: 0.2s;
-            margin-top: 5px;
+            transition: opacity 0.2s;
         }
 
-        .btn-connect { background: var(--accent); color: white; margin-bottom: 15px; }
-        .btn-primary { background: var(--primary); color: #000; }
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); margin-top: 10px; font-size: 12px; }
-        
-        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
 
-        #statusLog {
-            font-family: 'Consolas', monospace;
-            font-size: 11px;
-            color: var(--primary);
-            margin-top: 10px;
-            min-height: 18px;
-            text-align: center;
+        /* CONTENT: KERNEL MONITOR */
+        .monitor {
+            padding: 2rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
         }
 
-        .history-box {
-            margin-top: 20px;
-            border-top: 1px solid var(--border);
-            padding-top: 15px;
+        .tx-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            font-family: 'Cascadia Code', monospace;
+            font-size: 13px;
         }
 
-        #txList { max-height: 250px; overflow-y: auto; }
+        .hash-link { color: var(--primary); text-decoration: none; font-size: 11px; }
+        .tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #333; }
 
-        .tab-nav { display: flex; gap: 5px; margin-bottom: 15px; }
-        .tab-btn { 
-            flex: 1; padding: 10px; background: #21262d; border: 1px solid var(--border); 
-            color: #8b949e; border-radius: 8px; font-size: 12px; cursor: pointer;
+        .signing-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(4px);
         }
-        .tab-btn.active { background: var(--border); color: #fff; border-color: var(--accent); }
     </style>
 </head>
 <body>
 
-    <div class="header-box">
-        <div style="font-weight: 800; font-size: 18px; color: var(--primary);">BOZZDEX <span style="font-size: 10px; color: #555;">v46.0</span></div>
-        <div id="kernel-status" class="status-pill">SENTINEL IDLE</div>
+    <div id="signingOverlay" class="signing-overlay">
+        <div class="card" style="text-align: center;">
+            <div style="margin-bottom: 1rem;">⚡ KERNEL AWAITING SIGNATURE</div>
+            <div style="font-size: 12px; color: var(--dim);">Please check your wallet provider...</div>
+        </div>
     </div>
 
-    <button id="btnConnect" class="btn btn-connect">CONNECT WALLET</button>
+    <header>
+        <div>
+            <span style="font-weight: bold; letter-spacing: 2px;">SOVEREIGN // v71.0</span>
+        </div>
+        <div id="networkStatus" class="status-pill offline">Disconnected</div>
+    </header>
 
-    <div class="tab-nav">
-        <button id="tabSwapBtn" class="tab-btn active" onclick="switchTab('swap')">SWAP</button>
-        <button id="tabLiqBtn" class="tab-btn" onclick="switchTab('liquidity')">LIQUIDITY</button>
-    </div>
-
-    <div id="tab-swap" class="card">
-        <div class="input-group">
-            <label><span>Dari: WOPN</span> <span id="balIn">Saldo: 0.00</span></label>
-            <input type="number" id="inputAmount" placeholder="0.0">
-        </div>
-        <div style="text-align: center; color: var(--accent); margin: -5px 0 5px 0; font-size: 18px;">⬇</div>
-        <div class="input-group">
-            <label><span>Ke: OPNT (Estimasi)</span> <span id="balOut">Saldo: 0.00</span></label>
-            <input type="number" id="outputAmount" placeholder="0.0" readonly style="background: #090c10; color: var(--accent);">
-        </div>
-        <div id="statusLog">Koneksikan Wallet...</div>
-        <button id="btnSwap" class="btn btn-primary" disabled>EXECUTE SWAP</button>
-    </div>
-
-    <div id="tab-liquidity" class="card" style="display: none;">
-        <div class="input-group">
-            <label>Token A (WOPN)</label>
-            <input type="number" id="inputAmtA" placeholder="0.0">
-        </div>
-        <div class="input-group">
-            <label>Token B (OPNT)</label>
-            <input type="number" id="inputAmtB" placeholder="0.0">
-        </div>
-        <button id="btnLiquidity" class="btn btn-primary" disabled>ADD LIQUIDITY</button>
-        
-        <div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px;">
-            <label style="color: var(--danger); font-weight: bold;">REMOVE LIQUIDITY (%)</label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <button class="btn btn-outline" onclick="onRemoveLiq(1)" disabled>25%</button>
-                <button class="btn btn-outline" onclick="onRemoveLiq(2)" disabled>50%</button>
-                <button class="btn btn-outline" onclick="onRemoveLiq(3)" disabled>75%</button>
-                <button class="btn btn-outline" onclick="onRemoveLiq(4)" disabled>100%</button>
+    <main>
+        <section class="sidebar">
+            <div class="card">
+                <div class="balance-label">WALLET ADDRESS</div>
+                <div id="addrDisplay" style="font-size: 11px; color: var(--primary); word-break: break-all;">Not Connected</div>
             </div>
-        </div>
-    </div>
 
-    <div class="history-box">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <label>LEDGER TRANSACTION HISTORY</label>
-            <span onclick="clearHistory()" style="font-size: 10px; color: var(--danger); cursor: pointer; font-weight: bold;">[CLEAR]</span>
-        </div>
-        <div id="txList"></div>
-    </div>
+            <div class="card">
+                <div class="balance-label">ETH BALANCE (Native)</div>
+                <div id="ethBalance" class="balance-value">0.00</div>
+                
+                <div class="balance-label">WOPN BALANCE (Wrapped)</div>
+                <div id="wopnBalance" class="balance-value">0.00</div>
+            </div>
 
-    <script src="app.js"></script>
+            <div class="card">
+                <input type="number" id="txAmount" placeholder="0.00" step="0.01">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button id="btnDeposit" onclick="handleTx('DEPOSIT')">DEPOSIT</button>
+                    <button id="btnWithdraw" onclick="handleTx('WITHDRAW')" style="background: transparent; color: var(--primary); border: 1px solid var(--primary);">WITHDRAW</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="monitor">
+            <div style="font-size: 14px; font-weight: bold; border-left: 3px solid var(--primary); padding-left: 10px;">
+                TRANSACTION KERNEL JOURNAL
+            </div>
+            <div id="txJournal" class="card" style="min-height: 300px; padding: 0;">
+                </div>
+        </section>
+    </main>
+
     <script>
-        let userAddress = "";
-        let rpcProvider = new ethers.JsonRpcProvider("https://testnet-rpc2.iopn.tech");
-        let debounceTimer;
+        /**
+         * UI SYNC ADAPTER
+         * Menghubungkan Kernel v71.0 ke DOM
+         */
+        window.syncSovereignUI = (state) => {
+            const { vault, kernel, network } = state;
 
-        // --- UI TAB SYSTEM ---
-        function switchTab(tab) {
-            document.getElementById('tabSwapBtn').classList.toggle('active', tab === 'swap');
-            document.getElementById('tabLiqBtn').classList.toggle('active', tab === 'liquidity');
-            document.getElementById('tab-swap').style.display = tab === 'swap' ? 'block' : 'none';
-            document.getElementById('tab-liquidity').style.display = tab === 'liquidity' ? 'block' : 'none';
-        }
+            // 1. Update Network Status
+            const netPill = document.getElementById('networkStatus');
+            netPill.innerText = network.rpcStatus === 'OK' ? `CHAIN ${network.chainId}` : network.rpcStatus;
+            netPill.className = `status-pill ${network.connected ? 'online' : 'offline'}`;
 
-        // --- BALANCE & PRICE DISCOVERY ---
-        async function updateBalances() {
-            if (!userAddress) return;
-            try {
-                const abi = ["function balanceOf(address) view returns (uint256)"];
-                const cIn = new ethers.Contract(CONFIG.T_IN, abi, rpcProvider);
-                const cOut = new ethers.Contract(CONFIG.T_OUT, abi, rpcProvider);
-                const [bIn, bOut] = await Promise.all([cIn.balanceOf(userAddress), cOut.balanceOf(userAddress)]);
-                document.getElementById("balIn").innerText = "Saldo: " + ethers.formatUnits(bIn, 18);
-                document.getElementById("balOut").innerText = "Saldo: " + ethers.formatUnits(bOut, 18);
-            } catch (e) { console.error("Balance Error", e); }
-        }
+            // 2. Update Vault
+            document.getElementById('addrDisplay').innerText = vault.address || "Not Connected";
+            document.getElementById('ethBalance').innerText = parseFloat(vault.balanceIn).toFixed(4);
+            document.getElementById('wopnBalance').innerText = parseFloat(vault.balanceOut).toFixed(4);
 
-        // --- AUTO ESTIMATOR (Mencegah Swap Error) ---
-        document.getElementById("inputAmount").oninput = (e) => {
-            clearTimeout(debounceTimer);
-            const val = e.target.value;
-            if (!val || val <= 0) { document.getElementById("outputAmount").value = ""; return; }
+            // 3. Update Kernel UI State
+            const isBusy = kernel.status !== 'IDLE';
+            document.getElementById('btnDeposit').disabled = isBusy;
+            document.getElementById('btnWithdraw').disabled = isBusy;
+            document.getElementById('txAmount').disabled = isBusy;
+            
+            document.getElementById('signingOverlay').style.display = kernel.status === 'SIGNING' ? 'flex' : 'none';
 
-            debounceTimer = setTimeout(async () => {
-                try {
-                    // Logika Estimasi Sederhana atau panggil getPool
-                    // Disini kita asumsikan rasio 1:1 untuk testnet, sesuaikan jika pool ada fee
-                    const estimasi = parseFloat(val) * 0.99; // 1% fee buffer
-                    document.getElementById("outputAmount").value = estimasi.toFixed(6);
-                    document.getElementById("statusLog").innerText = "Price Updated ✅";
-                } catch (err) { 
-                    document.getElementById("outputAmount").value = "Error";
-                }
-            }, 500);
+            // 4. Render Journal
+            const journal = document.getElementById('txJournal');
+            journal.innerHTML = kernel.txQueue.length ? '' : '<div style="padding: 2rem; color: #444; text-align: center;">No transactions found in journal.</div>';
+            
+            kernel.txQueue.forEach(tx => {
+                const item = document.createElement('div');
+                item.className = 'tx-item';
+                const statusColor = tx.status === 'SUCCESS' ? 'var(--primary)' : (tx.status === 'FAILED' ? 'var(--error)' : '#ffaa00');
+                
+                item.innerHTML = `
+                    <div>
+                        <span class="tag">${tx.type}</span>
+                        <span style="color: ${statusColor}; margin-left: 8px;">● ${tx.status}</span>
+                        <br/>
+                        ${tx.hash ? `<a href="https://testnet.iopn.tech/tx/${tx.hash}" target="_blank" class="hash-link">${tx.hash.substring(0, 16)}...</a>` : `<span style="font-size: 10px; color: var(--dim);">${tx.error || 'No hash'}</span>`}
+                    </div>
+                    <div style="color: var(--dim); font-size: 10px;">${new Date(tx.ts).toLocaleTimeString()}</div>
+                `;
+                journal.appendChild(item);
+            });
         };
 
-        // --- WALLET CONNECT ---
-        async function connect() {
-            if (!window.ethereum) return alert("Buka di Rabby/Metamask bray!");
-            try {
-                const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-                userAddress = accounts[0];
-                document.getElementById("btnConnect").innerText = userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
-                document.querySelectorAll('button').forEach(b => b.disabled = false);
-                document.getElementById("statusLog").innerText = "Sentinel Ready 🛡️";
-                updateBalances();
-            } catch (err) { 
-                document.getElementById("statusLog").innerText = "Gagal Konek!";
-            }
-        }
-
-        // --- KERNEL BRIDGES ---
-        function setKernelStatus(isLive) {
-            const el = document.getElementById("kernel-status");
-            el.innerText = isLive ? "SENTINEL LIVE" : "SENTINEL IDLE";
-            el.className = isLive ? "status-pill status-online" : "status-pill";
-        }
-
-        async function onSwapClick() {
-            const val = document.getElementById("inputAmount").value;
-            const outVal = document.getElementById("outputAmount").value;
-            if (!val || !outVal || outVal === "Error") return;
-
-            setKernelStatus(true);
-            await window.executeKernelAction("SWAP", { 
-                amtIn: ethers.parseUnits(val, 18), 
-                minOut: ethers.parseUnits(outVal, 18) * 95n / 100n // Slippage 5%
+        /**
+         * ACTION HANDLER
+         */
+        function handleTx(mode) {
+            const amount = document.getElementById('txAmount').value;
+            if(!window.KernelDispatcher) return alert("Kernel not loaded!");
+            
+            window.KernelDispatcher.execute('WOPN_ACTION', {
+                mode: mode,
+                amount: amount
             });
-            setKernelStatus(false);
-            updateBalances();
         }
-
-        async function onAddLiquidityClick() {
-            const a = document.getElementById("inputAmtA").value;
-            const b = document.getElementById("inputAmtB").value;
-            if(!a || !b) return;
-
-            setKernelStatus(true);
-            await window.executeKernelAction("ADD_LIQUIDITY", { 
-                amtA: ethers.parseUnits(a, 18), 
-                amtB: ethers.parseUnits(b, 18) 
-            });
-            setKernelStatus(false);
-            updateBalances();
-        }
-
-        async function onRemoveLiq(percent) {
-            setKernelStatus(true);
-            await window.executeKernelAction("REMOVE_LIQUIDITY", { percent });
-            setKernelStatus(false);
-            updateBalances();
-        }
-
-        function clearHistory() {
-            if(confirm("Hapus Ledger?")) {
-                localStorage.removeItem("bozz_history");
-                window.renderHistory();
-            }
-        }
-
-        // Inisialisasi
-        document.getElementById("btnConnect").onclick = connect;
-        document.getElementById("btnSwap").onclick = onSwapClick;
-        document.getElementById("btnLiquidity").onclick = onAddLiquidityClick;
-        
-        // Render history saat load
-        window.addEventListener('load', () => {
-            if (window.renderHistory) window.renderHistory();
-        });
     </script>
-</body>
+
+    </body>
 </html>
