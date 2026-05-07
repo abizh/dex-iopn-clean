@@ -13,16 +13,16 @@ const CONFIG = {
 const ABI_TOKEN = [
     "function balanceOf(address) view returns (uint256)",
     "function allowance(address,address) view returns (uint256)",
-    "function approve(address,uint256) external returns (bool)",
-    "function totalSupply() view returns (uint256)" // Tambahin ini buat jaga-jaga
+    "function approve(address,uint256) external returns (bool)"
 ];
 
 const ABI_ROUTER = [
-    "function swap(address,address,uint256,uint256) external",
+    "function getPool(address tokenA, address tokenB) view returns (address)",
+    "function swap(address tIn, address tOut, uint256 amtIn, uint256 minOut) external",
     "function addLiquidity(address tA, address tB, uint256 amtA, uint256 amtB) external",
-    "function removeLiquidityMulti(address tA, address tB, uint8 percentChoice, bool toNative) external",
-    "function getPool(address,address) view returns (address)"
+    "function removeLiquidityMulti(address tA, address tB, uint8 percentChoice, bool toNative) external"
 ];
+
 const ABI_POOL = [
     // reserve
     "function reserve0() view returns (uint112)",
