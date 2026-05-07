@@ -23,7 +23,17 @@ const ABI_ROUTER = [
     "function removeLiquidityMulti(address tA, address tB, uint8 percentChoice, bool toNative) external",
     "function getPool(address,address) view returns (address)"
 ];
-const ABI_POOL = ["function reserve0() view returns (uint112)","function reserve1() view returns (uint112)","function token0() view returns (address)"];
+const ABI_POOL = [
+    // reserve
+    "function reserve0() view returns (uint112)",
+    "function reserve1() view returns (uint112)",
+    "function token0() view returns (address)",
+
+    // LP ERC20
+    "function balanceOf(address) view returns(uint256)",
+    "function allowance(address,address) view returns(uint256)",
+    "function approve(address,uint256) returns(bool)"
+];
 
 let walletProvider, rpcProvider, signer, userAddress, debounceTimer;
 
@@ -169,7 +179,11 @@ async function executeAddLiquidity() {
 async function executeRemoveLiquidity(percent) {
     try {
         const router = new ethers.Contract(CONFIG.BOZZ_ROUTER, ABI_ROUTER, rpcProvider);
-        const poolAddr = await router.getPool(CONFIG.T_IN, CONFIG.T_OUT);
+        const lp = new ethers.Contract(
+   poolAddress,
+   ABI_POOL,
+   signer
+);
         
         // Kita butuh approve LP Token sebelum remove
         log("Checking LP Approval... 🛡️");
