@@ -1,8 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<title>SOVEREIGN KERNEL v71.1</title>
+
+<!-- Ethers v6 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+
+<style>
+:root{
+    --bg:#0a0a0a;
+    --surface:#141414;
+    --border:#262626;
+    --primary:#00ff88;
+    --text:#e5e5e5;
+    --dim:#737373;
+    --error:#ff4444;
+}
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:Segoe UI,Arial,sans-serif;
+    height:100vh;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+}
+
+header{
+    height:64px;
+    border-bottom:1px solid var(--border);
+    background:var(--surface);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 20px;
+}
+
+.logo{
+    font-weight:700;
+    letter-spacing:2px;
+}
+
+.status-pill{
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+    border:1px solid var(--border);
+}
+
+.online{
+    color:var(--primary);
+    border-color:var(--primary);
+}
+
+.offline{
+    color:var(--error);
+    border-color:var(--error);
+}
+
+main{
+    flex:1;
+    display:grid;
+    grid-template-columns:340px 1fr;
+    overflow:hidden;
+}
+
+.sidebar{
+    border-right:1px solid var(--border);
+    padding:20px;
+    overflow:auto;
+}
+
+.monitor{
+    padding:20px;
+    overflow:auto;
+}
+
+.card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px;
+    margin-bottom:16px;
+}
+
+.label{
+    font-size:11px;
+    color:var(--dim);
+    margin-bottom:4px;
+}
+
+.balance{
+    font-size:24px;
+    font-weight:700;
+    margin-bottom:14px;
+}
+
+.address{
+    font-size:11px;
+    color:var(--primary);
+    word-break:break-all;
+}
+
+input{
+    width:100%;
+    padding:12px;
+    border-radius:6px;
+    border:1px solid var(--border);
+    background:#000;
+    color:#fff;
+    margin-bottom:12px;
+}
+
+.actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+}
+
+button{
+    padding:12px;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+    font-weight:700;
+}
+
+.primary-btn{
+    background:var(--primary);
+    color:#000;
+}
+
+.secondary-btn{
+    background:transparent;
+    border:1px solid var(--primary);
+    color:var(--primary);
+}
+
+button:disabled{
+    opacity:0.4;
+    cursor:not-allowed;
+}
+
+.tx-item{
+    padding:12px;
+    border-bottom:1px solid var(--border);
+    font-size:12px;
+    font-family:monospace;
+}
+
+.tx-success{
+    color:var(--primary);
+}
+
+.tx-failed{
+    color:var(--error);
+}
+
+.tx-hash{
+    color:#888;
+    font-size:11px;
+    margin-top:4px;
+}
+
+.empty{
+    padding:40px;
+    text-align:center;
+    color:#444;
+}
+
+.overlay{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,0.75);
+    backdrop-filter:blur(4px);
+    z-index:999;
+}
+
+.overlay-box{
+    background:var(--surface);
+    border:1px solid var(--border);
+    padding:24px;
+    border-radius:12px;
+    text-align:center;
+}
+
+@media(max-width:768px){
+    main{
+        grid-template-columns:1fr;
+    }
+
+    .sidebar{
+        border-right:none;
+        border-bottom:1px solid var(--border);
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div id="overlay" class="overlay">
+    <div class="overlay-box">
+        <div style="color:var(--primary);font-weight:700;margin-bottom:10px;">
+            ⚡ Awaiting Wallet Signature
+        </div>
+        <div style="font-size:12px;color:var(--dim);">
+            Cek wallet kamu brow...
+        </div>
+    </div>
+</div>
+
+<header>
+    <div class="logo">SOVEREIGN // v71.1</div>
+    <div id="networkStatus" class="status-pill offline">DISCONNECTED</div>
+</header>
+
+<main>
+
+    <section class="sidebar">
+
+        <div class="card">
+            <div class="label">WALLET ADDRESS</div>
+            <div id="walletAddress" class="address">
+                Not Connected
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="label">ETH BALANCE</div>
+            <div id="ethBalance" class="balance">0.0000</div>
+
+            <div class="label">WOPN BALANCE</div>
+            <div id="wopnBalance" class="balance">0.0000</div>
+        </div>
+
+        <div class="card">
+
+            <input
+                id="amountInput"
+                type="number"
+                step="0.0001"
+                placeholder="0.00"
+            />
+
+            <div class="actions">
+                <button class="primary-btn" id="depositBtn">
+                    DEPOSIT
+                </button>
+
+                <button class="secondary-btn" id="withdrawBtn">
+                    WITHDRAW
+                </button>
+            </div>
+
+        </div>
+
+    </section>
+
+    <section class="monitor">
+
+        <div style="margin-bottom:12px;font-weight:700;">
+            TRANSACTION JOURNAL
+        </div>
+
+        <div id="journal" class="card" style="padding:0;">
+            <div class="empty">
+                No transaction history.
+            </div>
+        </div>
+
+    </section>
+
+</main>
+
 <script>
 /**
- * SOVEREIGN ENGINE v71.0 - INDUSTRIAL MASTER
- * Status: HARDENED & RECTIFIED
+ * =========================================================
+ * SOVEREIGN ENGINE v71.1 - STABLE MASTER BUILD
+ * =========================================================
  */
+
 const SovereignEngine = (() => {
 
     const CONFIG = Object.freeze({
@@ -11,322 +302,577 @@ const SovereignEngine = (() => {
         WOPN: "0x826496be2340356C193566190802777174e929f9",
         TX_TIMEOUT: 90000,
         HEARTBEAT_INTERVAL: 8000,
-        GHOST_TTL: 600000,
-        PERSISTENCE_MAX_AGE: 86400000
+        GHOST_TTL: 600000
     });
 
-    // Melindungi struktur state agar tidak dirusak script eksternal
-    const _deepSeal = (obj, visited = new WeakSet()) => {
-        if (!obj || typeof obj !== 'object' || visited.has(obj)) return obj;
-        visited.add(obj);
-        Object.seal(obj);
-        Object.values(obj).forEach(v => _deepSeal(v, visited));
-        return obj;
-    };
-
     const INTERNAL = {
-        state: _deepSeal({
-            vault: { address: null, balanceIn: "0", balanceOut: "0" },
-            kernel: { status: "IDLE", txQueue: [] },
-            network: { chainId: null, connected: false, rpcStatus: "OFFLINE" }
-        }),
+        state: {
+            vault: {
+                address: null,
+                balanceIn: "0",
+                balanceOut: "0"
+            },
+
+            kernel: {
+                status: "IDLE",
+                txQueue: []
+            },
+
+            network: {
+                chainId: null,
+                connected: false,
+                rpcStatus: "DISCONNECTED"
+            }
+        },
 
         provider: null,
         staticProvider: new ethers.JsonRpcProvider(CONFIG.RPC),
+
         ghosts: new Map(),
         settlements: new Map(),
-        abortController: new AbortController(),
+
         lock: false,
-        inflightHydration: false,
-        hydrationScheduled: false,
-        epoch: 0,
-        syncScheduled: false,
         heartbeatId: null,
-        handlers: { accounts: null, chain: null }
+        syncScheduled: false,
+        hydrationRunning: false
     };
 
+    /**
+     * =====================================================
+     * CORE
+     * =====================================================
+     */
+
     const core = {
+
         async getProvider() {
-            if (!window.ethereum) throw new Error("NO_WALLET");
-            if (!INTERNAL.provider) {
-                INTERNAL.provider = new ethers.BrowserProvider(window.ethereum);
+
+            if (!window.ethereum) {
+                throw new Error("NO_WALLET");
             }
+
+            if (!INTERNAL.provider) {
+                INTERNAL.provider =
+                    new ethers.BrowserProvider(window.ethereum);
+            }
+
             return INTERNAL.provider;
         },
 
         mutate(updates) {
+
             let changed = false;
-            updates.forEach(([path, value]) => {
-                const keys = path.split('.');
+
+            for (const [path, value] of updates) {
+
+                const keys = path.split(".");
                 let target = INTERNAL.state;
-                for (let i = 0; i < keys.length - 1; i++) target = target[keys[i]];
+
+                for (let i = 0; i < keys.length - 1; i++) {
+                    target = target[keys[i]];
+                }
+
                 const last = keys[keys.length - 1];
+
                 if (target[last] !== value) {
                     target[last] = value;
                     changed = true;
                 }
-            });
+            }
+
             if (changed) {
-                this.sync();
-                this.persist();
+                this.syncUI();
             }
         },
 
-        sync() {
+        syncUI() {
+
             if (INTERNAL.syncScheduled) return;
+
             INTERNAL.syncScheduled = true;
+
             queueMicrotask(() => {
+
                 try {
-                    if (window.syncSovereignUI) {
-                        const snapshot = window.structuredClone
-                            ? structuredClone(INTERNAL.state)
-                            : JSON.parse(JSON.stringify(INTERNAL.state));
-                        window.syncSovereignUI(snapshot);
-                    }
+
+                    window.syncSovereignUI(
+                        structuredClone(INTERNAL.state)
+                    );
+
+                } catch (err) {
+
+                    console.error("SYNC_ERROR", err);
+
                 } finally {
+
                     INTERNAL.syncScheduled = false;
                 }
             });
-        },
-
-        persist() {
-            try {
-                const now = Date.now();
-                const settlements = [...INTERNAL.settlements.entries()]
-                    .filter(([_, v]) => now - v.ts < CONFIG.PERSISTENCE_MAX_AGE)
-                    .slice(-50);
-
-                localStorage.setItem("SOVEREIGN_JOURNAL", JSON.stringify({
-                    queue: INTERNAL.state.kernel.txQueue,
-                    settlements
-                }));
-            } catch {}
-        },
-
-        loadPersistence() {
-            try {
-                const raw = localStorage.getItem("SOVEREIGN_JOURNAL");
-                if (!raw) return;
-                const parsed = JSON.parse(raw);
-                INTERNAL.settlements = new Map(parsed.settlements || []);
-                
-                // FIX: Gunakan mutate agar UI langsung reaktif terhadap data lama
-                this.mutate([
-                    ['kernel.txQueue', parsed.queue || []]
-                ]);
-            } catch {}
         }
     };
 
-    return {
-        async execute(type, payload) {
-            if (INTERNAL.lock || INTERNAL.state.kernel.status !== "IDLE") return;
+    /**
+     * =====================================================
+     * PUBLIC API
+     * =====================================================
+     */
 
-            const amount = payload?.amount?.toString() || "0";
-            if (isNaN(amount) || parseFloat(amount) <= 0) return;
+    return {
+
+        async execute(type, payload) {
+
+            if (INTERNAL.lock) return;
+
+            const amount =
+                payload?.amount?.toString()?.trim() || "0";
+
+            if (
+                isNaN(amount) ||
+                Number(amount) <= 0
+            ) {
+                alert("Invalid amount");
+                return;
+            }
 
             INTERNAL.lock = true;
+
             let timeoutId = null;
 
             try {
+
                 const provider = await core.getProvider();
-                const network = await provider.getNetwork();
 
-                if (Number(network.chainId) !== CONFIG.CHAIN_ID) throw new Error("WRONG_NETWORK");
-                const signer = await provider.getSigner();
+                const network =
+                    await provider.getNetwork();
 
-                core.mutate([['kernel.status', 'SIGNING']]);
+                if (
+                    Number(network.chainId) !== CONFIG.CHAIN_ID
+                ) {
+                    throw new Error("WRONG_NETWORK");
+                }
 
-                const contract = new ethers.Contract(CONFIG.WOPN, [
-                    "function deposit() payable", 
-                    "function withdraw(uint256)"
-                ], signer);
+                const signer =
+                    await provider.getSigner();
 
-                const parsed = ethers.parseUnits(amount, 18);
-                const tx = payload.mode === "DEPOSIT"
-                    ? await contract.deposit({ value: parsed })
-                    : await contract.withdraw(parsed);
+                core.mutate([
+                    ["kernel.status", "SIGNING"]
+                ]);
 
-                core.mutate([['kernel.status', 'OBSERVING']]);
-                INTERNAL.ghosts.set(tx.hash, { ts: Date.now(), type });
+                const contract =
+                    new ethers.Contract(
+                        CONFIG.WOPN,
+                        [
+                            "function deposit() payable",
+                            "function withdraw(uint256)",
+                            "function balanceOf(address) view returns (uint256)"
+                        ],
+                        signer
+                    );
 
-                const abortPromise = new Promise((_, reject) => {
-                    const onAbort = () => reject(new Error("ABORTED"));
-                    INTERNAL.abortController.signal.addEventListener('abort', onAbort, { once: true });
-                    timeoutId = setTimeout(() => reject(new Error("TIMEOUT")), CONFIG.TX_TIMEOUT);
-                });
+                const parsed =
+                    ethers.parseEther(amount);
 
-                const receipt = await Promise.race([tx.wait(1), abortPromise]);
-                if (receipt) this.finalize(receipt.hash, type, "SUCCESS");
+                let tx;
+
+                if (payload.mode === "DEPOSIT") {
+
+                    tx = await contract.deposit({
+                        value: parsed
+                    });
+
+                } else {
+
+                    tx = await contract.withdraw(parsed);
+                }
+
+                core.mutate([
+                    ["kernel.status", "OBSERVING"]
+                ]);
+
+                INTERNAL.ghosts.set(
+                    tx.hash,
+                    {
+                        ts: Date.now(),
+                        type
+                    }
+                );
+
+                const receipt =
+                    await Promise.race([
+
+                        tx.wait(1),
+
+                        new Promise((_, reject) => {
+
+                            timeoutId = setTimeout(() => {
+                                reject(new Error("TIMEOUT"));
+                            }, CONFIG.TX_TIMEOUT);
+
+                        })
+                    ]);
+
+                if (receipt) {
+
+                    this.finalize(
+                        receipt.hash,
+                        type,
+                        "SUCCESS"
+                    );
+                }
 
             } catch (err) {
-                if (err.message !== "ABORTED") {
-                    this.finalize(null, type, "FAILED", err.reason || err.message);
-                }
+
+                console.error(err);
+
+                this.finalize(
+                    null,
+                    type,
+                    "FAILED",
+                    err?.reason || err?.message || "UNKNOWN"
+                );
+
             } finally {
-                if (timeoutId) clearTimeout(timeoutId);
+
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                }
+
                 INTERNAL.lock = false;
-                core.mutate([['kernel.status', 'IDLE']]);
+
+                core.mutate([
+                    ["kernel.status", "IDLE"]
+                ]);
             }
         },
 
         finalize(hash, type, status, error = null) {
-            const now = Date.now();
+
+            if (
+                hash &&
+                INTERNAL.settlements.get(hash)?.status === "SUCCESS"
+            ) {
+                return;
+            }
+
             if (hash) {
-                const existing = INTERNAL.settlements.get(hash);
-                if (existing?.status === "SUCCESS") {
-                    INTERNAL.ghosts.delete(hash);
-                    return;
-                }
-                INTERNAL.settlements.set(hash, { status, ts: now });
+                INTERNAL.settlements.set(hash, {
+                    status,
+                    ts: Date.now()
+                });
             }
 
             INTERNAL.ghosts.delete(hash);
-            const entry = { hash, type, status, error, ts: now };
-            
-            // Deduplikasi Hash
-            const queue = [entry, ...INTERNAL.state.kernel.txQueue]
-                .filter((v, i, arr) => !v.hash || arr.findIndex(t => t.hash === v.hash) === i)
-                .slice(0, 10);
 
-            core.mutate([['kernel.txQueue', queue]]);
-            this.scheduleHydrate();
-        },
+            const entry = {
+                hash,
+                type,
+                status,
+                error,
+                ts: Date.now()
+            };
 
-        scheduleHydrate() {
-            if (INTERNAL.hydrationScheduled) return;
-            INTERNAL.hydrationScheduled = true;
-            queueMicrotask(() => {
-                INTERNAL.hydrationScheduled = false;
-                this.hydrate();
-            });
+            const queue = [
+                entry,
+                ...INTERNAL.state.kernel.txQueue
+            ].slice(0, 10);
+
+            core.mutate([
+                ["kernel.txQueue", queue]
+            ]);
+
+            this.hydrate();
         },
 
         async hydrate() {
-            const address = INTERNAL.state.vault.address;
-            if (!address || INTERNAL.inflightHydration) return;
 
-            INTERNAL.inflightHydration = true;
-            const snapshot = address;
-            const epoch = ++INTERNAL.epoch;
+            if (INTERNAL.hydrationRunning) return;
+
+            const address =
+                INTERNAL.state.vault.address;
+
+            if (!address) return;
+
+            INTERNAL.hydrationRunning = true;
 
             try {
-                const started = Date.now();
-                const token = new ethers.Contract(CONFIG.WOPN, 
-                    ["function balanceOf(address) view returns (uint256)"], 
-                    INTERNAL.staticProvider);
 
-                const [eth, wopn] = await Promise.all([
-                    INTERNAL.staticProvider.getBalance(snapshot),
-                    token.balanceOf(snapshot)
+                const token =
+                    new ethers.Contract(
+                        CONFIG.WOPN,
+                        [
+                            "function balanceOf(address) view returns (uint256)"
+                        ],
+                        INTERNAL.staticProvider
+                    );
+
+                const [
+                    ethBalance,
+                    tokenBalance
+                ] = await Promise.all([
+                    INTERNAL.staticProvider.getBalance(address),
+                    token.balanceOf(address)
                 ]);
 
-                if (epoch === INTERNAL.epoch && snapshot === INTERNAL.state.vault.address) {
-                    core.mutate([
-                        ['vault.balanceIn', ethers.formatEther(eth)],
-                        ['vault.balanceOut', ethers.formatEther(wopn)],
-                        ['network.rpcStatus', Date.now() - started > 5000 ? 'STALE' : 'OK']
-                    ]);
-                }
-            } catch {
-                core.mutate([['network.rpcStatus', 'DEGRADED']]);
+                core.mutate([
+                    [
+                        "vault.balanceIn",
+                        ethers.formatEther(ethBalance)
+                    ],
+                    [
+                        "vault.balanceOut",
+                        ethers.formatEther(tokenBalance)
+                    ],
+                    [
+                        "network.rpcStatus",
+                        "OK"
+                    ]
+                ]);
+
+            } catch (err) {
+
+                console.error("HYDRATE_ERROR", err);
+
+                core.mutate([
+                    [
+                        "network.rpcStatus",
+                        "DEGRADED"
+                    ]
+                ]);
+
             } finally {
-                INTERNAL.inflightHydration = false;
+
+                INTERNAL.hydrationRunning = false;
             }
         },
 
         startHeartbeat() {
-            if (INTERNAL.heartbeatId) return;
-            INTERNAL.heartbeatId = setInterval(async () => {
-                if (INTERNAL.ghosts.size === 0) return;
-                const now = Date.now();
 
-                const jobs = [...INTERNAL.ghosts.entries()].map(async ([hash, meta]) => {
-                    if (now - meta.ts > CONFIG.GHOST_TTL) {
-                        INTERNAL.ghosts.delete(hash);
-                        return;
+            if (INTERNAL.heartbeatId) return;
+
+            INTERNAL.heartbeatId = setInterval(
+                async () => {
+
+                    if (
+                        INTERNAL.ghosts.size === 0
+                    ) return;
+
+                    for (const [hash, meta]
+                        of INTERNAL.ghosts.entries()) {
+
+                        if (
+                            Date.now() - meta.ts >
+                            CONFIG.GHOST_TTL
+                        ) {
+                            INTERNAL.ghosts.delete(hash);
+                            continue;
+                        }
+
+                        try {
+
+                            const receipt =
+                                await INTERNAL.staticProvider
+                                    .getTransactionReceipt(hash);
+
+                            if (receipt) {
+
+                                this.finalize(
+                                    hash,
+                                    meta.type,
+                                    "SUCCESS"
+                                );
+                            }
+
+                        } catch (err) {
+                            console.error("GHOST_ERROR", err);
+                        }
                     }
-                    try {
-                        const receipt = await INTERNAL.staticProvider.getTransactionReceipt(hash);
-                        if (receipt) this.finalize(hash, meta.type, "SUCCESS");
-                    } catch {}
-                });
-                await Promise.allSettled(jobs);
-            }, CONFIG.HEARTBEAT_INTERVAL);
+
+                },
+                CONFIG.HEARTBEAT_INTERVAL
+            );
         },
 
         async boot() {
-            if (window.__SOVEREIGN_LOADED__) return;
-
-            // 1. Inisialisasi awal (UI Sync pertama kali dari data persistence)
-            core.loadPersistence();
-            core.sync();
-
-            INTERNAL.handlers.accounts = (accounts) => {
-                const addr = accounts[0] || null;
-                core.mutate([
-                    ['vault.address', addr],
-                    ['vault.balanceIn', '0'],
-                    ['vault.balanceOut', '0'],
-                    ['network.connected', !!addr]
-                ]);
-                if (addr) this.scheduleHydrate();
-            };
-
-            INTERNAL.handlers.chain = (hex) => {
-                const chainId = parseInt(hex, 16);
-                INTERNAL.provider = null;
-                INTERNAL.ghosts.clear();
-                INTERNAL.abortController.abort();
-                INTERNAL.abortController = new AbortController();
-
-                core.mutate([
-                    ['network.chainId', chainId],
-                    ['network.rpcStatus', chainId === CONFIG.CHAIN_ID ? 'OK' : 'WRONG_NETWORK']
-                ]);
-                if (chainId === CONFIG.CHAIN_ID) this.scheduleHydrate();
-            };
 
             try {
-                const eth = window.ethereum;
-                if (!eth) throw new Error("NO_WALLET");
 
-                const [accounts, chain] = await Promise.all([
-                    eth.request({ method: 'eth_accounts' }),
-                    eth.request({ method: 'eth_chainId' })
+                if (!window.ethereum) {
+
+                    core.mutate([
+                        [
+                            "network.rpcStatus",
+                            "NO_WALLET"
+                        ]
+                    ]);
+
+                    return;
+                }
+
+                const provider =
+                    await core.getProvider();
+
+                const [
+                    accounts,
+                    chainHex
+                ] = await Promise.all([
+
+                    window.ethereum.request({
+                        method: "eth_accounts"
+                    }),
+
+                    window.ethereum.request({
+                        method: "eth_chainId"
+                    })
                 ]);
 
-                INTERNAL.handlers.accounts(accounts);
-                INTERNAL.handlers.chain(chain);
+                const chainId =
+                    parseInt(chainHex, 16);
 
-                eth.on('accountsChanged', INTERNAL.handlers.accounts);
-                eth.on('chainChanged', INTERNAL.handlers.chain);
+                core.mutate([
+                    [
+                        "vault.address",
+                        accounts[0] || null
+                    ],
+                    [
+                        "network.connected",
+                        !!accounts[0]
+                    ],
+                    [
+                        "network.chainId",
+                        chainId
+                    ],
+                    [
+                        "network.rpcStatus",
+                        chainId === CONFIG.CHAIN_ID
+                            ? "OK"
+                            : "WRONG_NETWORK"
+                    ]
+                ]);
+
+                if (accounts[0]) {
+                    await this.hydrate();
+                }
+
+                window.ethereum.on(
+                    "accountsChanged",
+                    (accounts) => {
+
+                        const address =
+                            accounts[0] || null;
+
+                        core.mutate([
+                            [
+                                "vault.address",
+                                address
+                            ],
+                            [
+                                "network.connected",
+                                !!address
+                            ],
+                            [
+                                "vault.balanceIn",
+                                "0"
+                            ],
+                            [
+                                "vault.balanceOut",
+                                "0"
+                            ]
+                        ]);
+
+                        if (address) {
+                            this.hydrate();
+                        }
+                    }
+                );
+
+                window.ethereum.on(
+                    "chainChanged",
+                    (chainHex) => {
+
+                        const chainId =
+                            parseInt(chainHex, 16);
+
+                        INTERNAL.provider = null;
+
+                        core.mutate([
+                            [
+                                "network.chainId",
+                                chainId
+                            ],
+                            [
+                                "network.rpcStatus",
+                                chainId === CONFIG.CHAIN_ID
+                                    ? "OK"
+                                    : "WRONG_NETWORK"
+                            ]
+                        ]);
+
+                        this.hydrate();
+                    }
+                );
 
                 this.startHeartbeat();
-                window.__SOVEREIGN_LOADED__ = true;
 
-                console.log("%c SOVEREIGN MASTER ACTIVE ", "background:#000;color:#00ff88;font-weight:bold;");
-            } catch (e) {
-                console.error("BOOT_FAIL", e);
-            }
-        },
+                console.log(
+                    "%c SOVEREIGN v71.1 READY ",
+                    "background:#111;color:#00ff88;padding:4px;"
+                );
 
-        unmount() {
-            const eth = window.ethereum;
-            if (eth) {
-                eth.removeListener('accountsChanged', INTERNAL.handlers.accounts);
-                eth.removeListener('chainChanged', INTERNAL.handlers.chain);
+            } catch (err) {
+
+                console.error("BOOT_ERROR", err);
+
+                core.mutate([
+                    [
+                        "network.rpcStatus",
+                        "BOOT_FAILED"
+                    ]
+                ]);
             }
-            if (INTERNAL.heartbeatId) clearInterval(INTERNAL.heartbeatId);
-            INTERNAL.abortController.abort();
-            INTERNAL.provider = null;
-            INTERNAL.ghosts.clear();
-            window.__SOVEREIGN_LOADED__ = false;
         }
     };
 })();
 
-window.KernelDispatcher = SovereignEngine;
-SovereignEngine.boot();
-        </script>
-        
+/**
+ * =========================================================
+ * UI SYNC
+ * =========================================================
+ */
+
+window.syncSovereignUI = (state) => {
+
+    const {
+        vault,
+        kernel,
+        network
+    } = state;
+
+    const statusEl =
+        document.getElementById("networkStatus");
+
+    statusEl.innerText =
+        network.rpcStatus;
+
+    statusEl.className =
+        `status-pill ${
+            network.connected
+                ? "online"
+                : "offline"
+        }`;
+
+    document.getElementById(
+        "walletAddress"
+    ).innerText =
+        vault.address || "Not Connected";
+
+    document.getElementById(
+        "ethBalance"
+    ).innerText =
+        Number(vault.balanceIn).toFixed(4);
+
+    document.getElementById(
+        "wopnBalance"
+    ).innerText =
+        Number(vault.balanceOut).toFixed(4);
+
+    const
