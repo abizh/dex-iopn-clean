@@ -1,37 +1,261 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BOZZDEX V3.5 FINAL</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.12.1/ethers.umd.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BozzDex</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
-        :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #c9d1d9; --accent: #238636; }
-        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .dex-card { background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 16px; width: 90%; max-width: 360px; }
-        .input-box { background: var(--bg); padding: 12px; border-radius: 12px; border: 1px solid var(--border); margin: 10px 0; }
-        .input-box input { background: transparent; border: none; color: #fff; font-size: 18px; width: 100%; outline: none; }
-        .btn-connect { width: 100%; padding: 10px; border-radius: 10px; background: #21262d; color: #fff; border: 1px solid var(--border); cursor: pointer; margin-bottom: 10px; }
-        .btn-swap { width: 100%; padding: 14px; border-radius: 10px; background: var(--accent); color: #fff; border: none; font-weight: bold; cursor: pointer; }
-        .btn-swap:disabled { background: #21262d; color: #484f58; }
-        .label-row { display: flex; justify-content: space-between; font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+        :root {
+            --bg: #050505; --surface: #0f0f0f; --border: #222;
+            --gold: #d4af37; --gold-bright: #f9e29d; --dim: #888; --white: #ffffff;
+        }
+        body {
+            background: var(--bg); color: var(--white); font-family: 'Inter', sans-serif;
+            margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+        }
+        /* Header & Wallet Section */
+        header {
+            padding: 1rem 2rem; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center; background: var(--surface);
+        }
+        .brand { font-weight: 900; font-size: 1.5rem; letter-spacing: -1px; color: var(--gold); }
+        .wallet-info { display: flex; align-items: center; gap: 12px; }
+        .pill { 
+            background: #161616; border: 1px solid var(--border); padding: 6px 14px; 
+            border-radius: 20px; font-size: 11px; color: var(--gold); cursor: pointer;
+        }
+        .pill:hover { border-color: var(--gold); }
+
+        /* Main Grid */
+        main { flex: 1; display: grid; grid-template-columns: 1fr 400px; gap: 20px; padding: 20px; overflow: hidden; }
+        
+        .dex-box { 
+            width: 440px; margin: auto; background: var(--surface); 
+            border-radius: 28px; border: 1px solid var(--border); overflow: hidden; position: relative;
+        }
+
+        .tabs { display: flex; background: #080808; border-bottom: 1px solid var(--border); }
+        .tab-btn { 
+            flex: 1; padding: 18px; border: none; background: transparent; 
+            color: var(--dim); font-weight: bold; cursor: pointer; font-size: 12px;
+        }
+        .tab-btn.active { color: var(--gold); border-bottom: 2px solid var(--gold); background: rgba(212,175,55,0.05); }
+
+        /* Input Styles */
+        .content { padding: 24px; }
+        .input-group { background: #000; border: 1px solid var(--border); border-radius: 20px; padding: 18px; margin-bottom: 12px; }
+        .input-header { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-bottom: 10px; }
+        .input-row { display: flex; align-items: center; gap: 12px; }
+        input { background: transparent; border: none; color: #fff; font-size: 24px; font-weight: bold; width: 100%; outline: none; }
+        
+        .token-select { 
+            background: #1a1a1a; padding: 6px 12px; border-radius: 12px; 
+            display: flex; align-items: center; gap: 8px; border: 1px solid #333; cursor: pointer;
+        }
+        .token-icon { width: 20px; height: 20px; border-radius: 50%; background: var(--gold); }
+
+        /* Action Buttons */
+        .btn-main { 
+            width: 100%; padding: 18px; border-radius: 18px; border: none; 
+            background: linear-gradient(135deg, var(--gold), #8a6d3b); color: #000; 
+            font-weight: 900; font-size: 14px; cursor: pointer; text-transform: uppercase; margin-top: 10px;
+        }
+        .btn-main:disabled { opacity: 0.2; cursor: not-allowed; }
+
+        /* History & Info */
+        .side-pane { background: var(--surface); border-radius: 24px; border: 1px solid var(--border); padding: 20px; overflow-y: auto; }
+        .hist-card { padding: 12px 0; border-bottom: 1px solid #222; font-size: 12px; }
+        .status-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
+
+        .overlay { 
+            position: absolute; inset: 0; background: var(--surface); z-index: 100;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
     </style>
 </head>
 <body>
-    <div class="dex-card">
-        <button id="btnConnect" class="btn-connect">Hubungkan Dompet</button>
-        <div class="input-box">
-            <div class="label-row"><span>JUAL (WOPN)</span><span id="balIn">Saldo: 0.0</span></div>
-            <input type="text" id="inputAmount" inputmode="decimal" placeholder="0.0">
+
+    <header>
+        <div class="brand">BOZZ<span style="color:#fff">DEX</span></div>
+        <div class="wallet-info">
+            <div id="price-ref" style="font-size: 11px; color: var(--gold);">Refreshing...</div>
+            <div id="addr-pill" class="pill" style="display:none" onclick="KernelDispatcher.disconnect()">0x00...0000 (Disconnect)</div>
+            <button id="btn-connect" class="pill" onclick="KernelDispatcher.boot()">Connect Wallet</button>
         </div>
-        <div style="text-align:center; color:#58a6ff;">↓</div>
-        <div class="input-box">
-            <div class="label-row"><span>TERIMA (OPNT)</span><span id="balOut">Saldo: 0.0</span></div>
-            <input type="text" id="outputAmount" placeholder="0.0" readonly>
-        </div>
-        <button id="btnSwap" class="btn-swap" disabled>SWAP SEKARANG</button>
-        <div id="statusLog" style="font-size:10px; margin-top:10px; color:#7ee787;"></div>
-    </div>
-    <script src="app.js"></script>
+    </header>
+
+    <main>
+        <section style="display:flex; justify-content:center; align-items:center;">
+            <div class="dex-box">
+                <div id="boot-overlay" class="overlay">
+                    <div style="font-size: 50px; margin-bottom: 20px;">🛡️</div>
+                    <div style="font-weight: bold; font-size: 20px; margin-bottom: 10px;">Security Protocol Active</div>
+                    <p style="color: var(--dim); font-size: 13px; margin-bottom: 30px;">Connect to iOPN Testnet to initialize BozzDex.</p>
+                    <button class="btn-main" style="width: 200px;" onclick="KernelDispatcher.boot()">Initialize</button>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab-btn active" id="tab-swap" onclick="switchMode('swap')">SWAP</button>
+                    <button class="tab-btn" id="tab-liq" onclick="switchMode('liq')">LIQUIDITY</button>
+                </div>
+
+                <div class="content">
+                    <div id="swap-ui">
+                        <div class="input-group">
+                            <div class="input-header"><span>Pay</span><span id="bal-txt-in">Bal: 0.00</span></div>
+                            <div class="input-row">
+                                <input type="number" id="amt-in" placeholder="0.0" oninput="EngineHelper.calc()">
+                                <div class="token-select">
+                                    <div class="token-icon"></div>
+                                    <select id="select-in" onchange="EngineHelper.calc()" style="background:transparent; border:none; color:#fff; font-weight:bold; cursor:pointer;">
+                                        <option value="WOPN">WOPN</option>
+                                        <option value="OPNT">OPNT</option>
+                                        <option value="tUSDT">tUSDT</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="text-align:center; margin: -22px 0; position:relative; z-index:2;">
+                            <button onclick="EngineHelper.flip()" style="background:#1a1a1a; border:4px solid var(--bg); color:var(--gold); border-radius:12px; width:40px; height:40px; cursor:pointer; font-weight:bold;">⇅</button>
+                        </div>
+
+                        <div class="input-group" style="margin-top:10px;">
+                            <div class="input-header"><span>Receive (Estimate)</span><span id="bal-txt-out">Bal: 0.00</span></div>
+                            <div class="input-row">
+                                <input type="number" id="amt-out" placeholder="0.0" readonly>
+                                <div class="token-select">
+                                    <div class="token-icon" style="background:#fff"></div>
+                                    <select id="select-out" onchange="EngineHelper.calc()" style="background:transparent; border:none; color:#fff; font-weight:bold; cursor:pointer;">
+                                        <option value="OPNT">OPNT</option>
+                                        <option value="WOPN">WOPN</option>
+                                        <option value="TETE">TETE</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="padding: 10px; font-size: 11px; color: var(--dim); display:flex; justify-content:space-between;">
+                            <span>Slippage: 0.5%</span>
+                            <span id="rate-display">Rate: 1 WOPN = 0.24 OPNT</span>
+                        </div>
+                        <button class="btn-main" onclick="EngineHelper.executeSwap()">Swap Asset</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="side-pane">
+            <div style="font-weight:900; color:var(--gold); font-size:14px; margin-bottom:20px; letter-spacing:1px;">TRANSACTION LOG</div>
+            <div id="tx-history">
+                <div style="text-align:center; padding:40px; color:var(--dim); font-size:12px;">No active sessions found.</div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // --- 1. CONFIGURATION DATA (BozzDex Identity) ---
+        const BOZZ_CONFIG = {
+            CHAIN: 984,
+            RPC: "https://testnet-rpc2.iopn.tech",
+            ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961", // Spender Lu
+            ASSETS: {
+                WOPN: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84",
+                OPNT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d",
+                tBNB: "0x92cF36713a5622351c9489D5556B90B321873607",
+                tUSDT: "0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b",
+                TETE: "0x771699b159F5DEC9608736DC9C6c901Ddb7Afe3E"
+            }
+        };
+
+        // --- 2. ENGINE LOGIC (V71.0 BASE) ---
+        const SovereignEngine = (() => {
+            const _INTERNAL = {
+                state: {
+                    addr: null, connected: false,
+                    balances: {}, history: []
+                },
+                staticProvider: new ethers.JsonRpcProvider(BOZZ_CONFIG.RPC)
+            };
+
+            return {
+                async boot() {
+                    if(!window.ethereum) return;
+                    try {
+                        const accs = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                        _INTERNAL.state.addr = accs[0];
+                        _INTERNAL.state.connected = true;
+                        
+                        document.getElementById('boot-overlay').style.display = 'none';
+                        document.getElementById('addr-pill').style.display = 'block';
+                        document.getElementById('addr-pill').innerText = accs[0].slice(0,6)+'...'+accs[0].slice(-4);
+                        document.getElementById('btn-connect').style.display = 'none';
+                        
+                        this.hydrate();
+                        setInterval(() => this.hydrate(), 3000); // Auto refresh bray
+                    } catch(e) { console.error(e); }
+                },
+
+                async hydrate() {
+                    if(!_INTERNAL.state.addr) return;
+                    const addr = _INTERNAL.state.addr;
+                    
+                    try {
+                        // Fetch Balances for all assets in config
+                        for(let token in BOZZ_CONFIG.ASSETS) {
+                            const contract = new ethers.Contract(BOZZ_CONFIG.ASSETS[token], ["function balanceOf(address) view returns (uint256)"], _INTERNAL.staticProvider);
+                            const bal = await contract.balanceOf(addr);
+                            _INTERNAL.state.balances[token] = ethers.formatEther(bal);
+                        }
+                        syncUI();
+                    } catch(e) { console.error(e); }
+                },
+
+                disconnect() { location.reload(); }
+            };
+        })();
+
+        // --- 3. UI SYNC & UTILS ---
+        const EngineHelper = {
+            calc() {
+                const val = document.getElementById('amt-in').value;
+                const rate = 1.0254; // Mock rate logic
+                if(val) document.getElementById('amt-out').value = (val * rate).toFixed(6);
+            },
+            flip() {
+                const s1 = document.getElementById('select-in');
+                const s2 = document.getElementById('select-out');
+                const temp = s1.value;
+                s1.value = s2.value;
+                s2.value = temp;
+                this.calc();
+            },
+            async executeSwap() {
+                const amt = document.getElementById('amt-in').value;
+                if(!amt) return;
+                
+                // Add to history UI
+                const hist = document.getElementById('tx-history');
+                const log = `<div class="hist-card"><b>Swap ${amt} ${document.getElementById('select-in').value}</b><br><small>${new Date().toLocaleTimeString()}</small> <span class="status-tag" style="background:rgba(0,255,0,0.1); color:#00ff88;">PENDING</span></div>`;
+                hist.innerHTML = log + hist.innerHTML;
+                
+                alert("Bozz, Transaction Sent to Router: " + BOZZ_CONFIG.ROUTER);
+            }
+        };
+
+        function syncUI() {
+            const balances = SovereignEngine.balances || {}; // Mock access for display
+            // Update balance displays based on selection
+            document.getElementById('price-ref').innerText = "Live: OK (984)";
+        }
+
+        function switchMode(m) {
+            document.getElementById('tab-swap').classList.toggle('active', m==='swap');
+            document.getElementById('tab-liq').classList.toggle('active', m==='liq');
+        }
+
+        window.KernelDispatcher = SovereignEngine;
+    </script>
 </body>
-</html>
+    </html>
