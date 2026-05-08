@@ -2,75 +2,101 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BozzDex</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>BozzDex Mobile v75.5</title>
     <style>
         :root {
-            --bg: #050505; --surface: #0f0f0f; --border: #222;
-            --gold: #d4af37; --gold-bright: #f9e29d; --dim: #888; --white: #ffffff;
+            --bg: #030303; --card: #0f0f0f; --inner: #000000;
+            --gold: #d4af37; --gold-dark: #b8860b; --text: #ffffff; --dim: #888;
+            --accent: #a020f0; /* Vibe ungu OPNSwap */
         }
-        body {
-            background: var(--bg); color: var(--white); font-family: 'Inter', sans-serif;
-            margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background: var(--bg); color: var(--text);
+            font-family: -apple-system, system-ui, sans-serif;
+            overflow: hidden;
         }
-        /* Header & Wallet Section */
+
+        /* Nav Header */
         header {
-            padding: 1rem 2rem; border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center; background: var(--surface);
+            position: fixed; top: 0; left: 0; right: 0; height: 70px;
+            padding: env(safe-area-inset-top) 20px 0;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #1a1a1a; z-index: 100;
         }
-        .brand { font-weight: 900; font-size: 1.5rem; letter-spacing: -1px; color: var(--gold); }
-        .wallet-info { display: flex; align-items: center; gap: 12px; }
-        .pill { 
-            background: #161616; border: 1px solid var(--border); padding: 6px 14px; 
-            border-radius: 20px; font-size: 11px; color: var(--gold); cursor: pointer;
-        }
-        .pill:hover { border-color: var(--gold); }
+        .brand { font-weight: 900; font-size: 1.2rem; color: var(--gold); letter-spacing: 1px; }
 
-        /* Main Grid */
-        main { flex: 1; display: grid; grid-template-columns: 1fr 400px; gap: 20px; padding: 20px; overflow: hidden; }
+        main {
+            position: absolute; top: 70px; bottom: 0; left: 0; right: 0;
+            padding: 15px; overflow-y: auto; display: flex; flex-direction: column;
+        }
+
+        /* Tab Utama (Top Level) */
+        .main-tabs {
+            display: flex; background: var(--inner); border-radius: 20px;
+            padding: 5px; margin-bottom: 20px; border: 1px solid #1a1a1a;
+        }
+        .m-tab {
+            flex: 1; padding: 12px; text-align: center; font-size: 13px; 
+            font-weight: 700; color: var(--dim); border-radius: 16px; transition: 0.3s;
+        }
+        .m-tab.active { background: #1a1a1a; color: var(--gold); }
+
+        /* Card Container */
+        .card {
+            background: var(--card); border-radius: 30px; 
+            padding: 20px 15px; border: 1px solid #222;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+        }
+
+        /* Liquidity Sub-Tabs */
+        .sub-nav {
+            display: flex; background: var(--inner); border-radius: 15px;
+            margin-bottom: 20px; padding: 4px; border: 1px solid #111;
+        }
+        .s-tab {
+            flex: 1; padding: 10px; font-size: 11px; font-weight: 700; 
+            color: var(--dim); border-radius: 12px; text-align: center;
+        }
+        .s-tab.active { background: #222; color: #fff; }
+
+        /* Input Native Box */
+        .input-group {
+            background: var(--inner); border-radius: 22px; padding: 18px;
+            border: 1px solid #111; margin-bottom: 8px;
+        }
+        .meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-bottom: 10px; }
+        .row { display: flex; align-items: center; justify-content: space-between; }
+        input { background: transparent; border: none; color: #fff; font-size: 26px; font-weight: bold; width: 60%; }
         
-        .dex-box { 
-            width: 440px; margin: auto; background: var(--surface); 
-            border-radius: 28px; border: 1px solid var(--border); overflow: hidden; position: relative;
+        .token-pill {
+            background: #1a1a1a; padding: 8px 12px; border-radius: 14px;
+            display: flex; align-items: center; gap: 8px; border: 1px solid #333;
+        }
+        select { background: transparent; border: none; color: #fff; font-weight: bold; font-size: 13px; }
+
+        .divider { display: flex; justify-content: center; margin: -22px 0; position: relative; z-index: 10; }
+        .circle-btn {
+            background: #111; border: 4px solid var(--bg); width: 42px; height: 42px;
+            border-radius: 12px; color: var(--gold); display: flex; align-items: center; justify-content: center;
+            font-size: 18px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
-        .tabs { display: flex; background: #080808; border-bottom: 1px solid var(--border); }
-        .tab-btn { 
-            flex: 1; padding: 18px; border: none; background: transparent; 
-            color: var(--dim); font-weight: bold; cursor: pointer; font-size: 12px;
-        }
-        .tab-btn.active { color: var(--gold); border-bottom: 2px solid var(--gold); background: rgba(212,175,55,0.05); }
+        /* Remove Liquidity Slider */
+        .slider-box { padding: 20px 10px; }
+        input[type=range] { width: 100%; accent-color: var(--gold); margin: 15px 0; }
+        .percent-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .p-btn { background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 8px; border-radius: 10px; font-size: 11px; }
 
-        /* Input Styles */
-        .content { padding: 24px; }
-        .input-group { background: #000; border: 1px solid var(--border); border-radius: 20px; padding: 18px; margin-bottom: 12px; }
-        .input-header { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-bottom: 10px; }
-        .input-row { display: flex; align-items: center; gap: 12px; }
-        input { background: transparent; border: none; color: #fff; font-size: 24px; font-weight: bold; width: 100%; outline: none; }
-        
-        .token-select { 
-            background: #1a1a1a; padding: 6px 12px; border-radius: 12px; 
-            display: flex; align-items: center; gap: 8px; border: 1px solid #333; cursor: pointer;
-        }
-        .token-icon { width: 20px; height: 20px; border-radius: 50%; background: var(--gold); }
-
-        /* Action Buttons */
-        .btn-main { 
-            width: 100%; padding: 18px; border-radius: 18px; border: none; 
-            background: linear-gradient(135deg, var(--gold), #8a6d3b); color: #000; 
-            font-weight: 900; font-size: 14px; cursor: pointer; text-transform: uppercase; margin-top: 10px;
-        }
-        .btn-main:disabled { opacity: 0.2; cursor: not-allowed; }
-
-        /* History & Info */
-        .side-pane { background: var(--surface); border-radius: 24px; border: 1px solid var(--border); padding: 20px; overflow-y: auto; }
-        .hist-card { padding: 12px 0; border-bottom: 1px solid #222; font-size: 12px; }
-        .status-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
-
-        .overlay { 
-            position: absolute; inset: 0; background: var(--surface); z-index: 100;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        /* Action Button */
+        .btn-prime {
+            width: 100%; padding: 18px; border-radius: 22px; border: none;
+            background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+            color: #000; font-weight: 900; font-size: 16px; margin-top: 20px;
         }
     </style>
 </head>
@@ -78,188 +104,78 @@
 
     <header>
         <div class="brand">BOZZ<span style="color:#fff">DEX</span></div>
-        <div class="wallet-info">
-            <div id="price-ref" style="font-size: 11px; color: var(--gold);">Refreshing...</div>
-            <div id="addr-pill" class="pill" style="display:none" onclick="KernelDispatcher.disconnect()">0x00...0000 (Disconnect)</div>
-            <button id="btn-connect" class="pill" onclick="KernelDispatcher.boot()">Connect Wallet</button>
-        </div>
+        <div id="wallet" style="background:#1a1a1a; padding:8px 12px; border-radius:12px; font-size:11px; font-weight:bold; border:1px solid #333;">0x6666...1af4</div>
     </header>
 
-    <main style="flex: 1; display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 80px); padding: 20px; overflow-y: auto; gap: 30px;">
-        <div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 30px; max-width: 1200px; width: 100%;">
-            
-            <section style="display:flex; justify-content:center; align-items:center;">
-                <div class="dex-box" style="margin: 0; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
-                    <div id="boot-overlay" class="overlay">
-                        <div style="font-size: 50px; margin-bottom: 20px;">🛡️</div>
-                        <div style="font-weight: bold; font-size: 20px; margin-bottom: 10px;">Security Protocol Active</div>
-                        <p style="color: var(--dim); font-size: 13px; margin-bottom: 30px; text-align: center;">Connect to iOPN Testnet to initialize BozzDex.</p>
-                        <button class="btn-main" style="width: 200px;" onclick="KernelDispatcher.boot()">Initialize</button>
-                    </div>
+    <main>
+        <div class="main-tabs">
+            <div class="m-tab active" id="m-swap" onclick="switchMain('swap')">Swap</div>
+            <div class="m-tab" id="m-liq" onclick="switchMain('liq')">Liquidity</div>
+        </div>
 
-                    <div class="tabs">
-                        <button class="tab-btn active" id="tab-swap" onclick="switchMode('swap')">SWAP</button>
-                        <button class="tab-btn" id="tab-liq" onclick="switchMode('liq')">LIQUIDITY</button>
-                    </div>
+        <div class="card">
+            <div id="liq-nav" class="sub-nav" style="display: none;">
+                <div class="s-tab active" id="s-add" onclick="switchSub('add')">Add Liquidity</div>
+                <div class="s-tab" id="s-rem" onclick="switchSub('rem')">Remove Liquidity</div>
+            </div>
 
-                    <div class="content">
-                        <div id="swap-ui">
-                            <div class="input-group">
-                                <div class="input-header"><span>Pay</span><span id="bal-txt-in">Bal: 0.00</span></div>
-                                <div class="input-row">
-                                    <input type="number" id="amt-in" placeholder="0.0" oninput="EngineHelper.calc()">
-                                    <div class="token-select">
-                                        <div class="token-icon"></div>
-                                        <select id="select-in" onchange="EngineHelper.calc()" style="background:transparent; border:none; color:#fff; font-weight:bold; cursor:pointer; outline:none;">
-                                            <option value="WOPN">WOPN</option>
-                                            <option value="OPNT">OPNT</option>
-                                            <option value="tUSDT">tUSDT</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div style="text-align:center; margin: -22px 0; position:relative; z-index:2;">
-                                <button onclick="EngineHelper.flip()" style="background:#1a1a1a; border:4px solid var(--bg); color:var(--gold); border-radius:12px; width:40px; height:40px; cursor:pointer; font-weight:bold; transition: 0.2s;">⇅</button>
-                            </div>
-
-                            <div class="input-group" style="margin-top:10px;">
-                                <div class="input-header"><span>Receive (Estimate)</span><span id="bal-txt-out">Bal: 0.00</span></div>
-                                <div class="input-row">
-                                    <input type="number" id="amt-out" placeholder="0.0" readonly>
-                                    <div class="token-select">
-                                        <div class="token-icon" style="background:#fff"></div>
-                                        <select id="select-out" onchange="EngineHelper.calc()" style="background:transparent; border:none; color:#fff; font-weight:bold; cursor:pointer; outline:none;">
-                                            <option value="OPNT">OPNT</option>
-                                            <option value="WOPN">WOPN</option>
-                                            <option value="TETE">TETE</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div style="padding: 12px 5px; font-size: 11px; color: var(--dim); display:flex; justify-content:space-between;">
-                                <span>Slippage: 0.5%</span>
-                                <span id="rate-display">Rate: 1 WOPN = 1.025 OPNT</span>
-                            </div>
-                            <button class="btn-main" onclick="EngineHelper.executeSwap()">Swap Asset</button>
+            <div id="dynamic-content">
+                <div class="input-group">
+                    <div class="meta"><span>From / Input</span><span>Balance: <b id="bal-in">0.00</b></span></div>
+                    <div class="row">
+                        <input type="number" id="amt-in" placeholder="0.0">
+                        <div class="token-pill">
+                            <select id="sel-in"><option>WOPN</option><option>OPNT</option></select>
                         </div>
                     </div>
                 </div>
-            </section>
 
-            <section class="side-pane" style="height: 500px; width: 380px; margin: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-                <div style="font-weight:900; color:var(--gold); font-size:14px; margin-bottom:20px; letter-spacing:1px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">TRANSACTION LOG</div>
-                <div id="tx-history" style="height: calc(100% - 50px); overflow-y: auto;">
-                    <div style="text-align:center; padding:40px; color:var(--dim); font-size:12px;">No active sessions found.</div>
+                <div class="divider"><div class="circle-btn" id="mid-icon">⇅</div></div>
+
+                <div class="input-group" style="margin-top: 10px;" id="box-out">
+                    <div class="meta"><span>To / Input</span><span>Balance: <b id="bal-out">0.00</b></span></div>
+                    <div class="row">
+                        <input type="number" id="amt-out" placeholder="0.0">
+                        <div class="token-pill">
+                            <select id="sel-out"><option>OPNT</option><option>WOPN</option></select>
+                        </div>
+                    </div>
                 </div>
-            </section>
 
+                <div id="remove-ui" class="slider-box" style="display: none;">
+                    <div class="meta"><span>Amount to Remove: <b id="range-val">25%</b></span></div>
+                    <input type="range" min="0" max="100" value="25" oninput="document.getElementById('range-val').innerText = this.value + '%'">
+                    <div class="percent-grid">
+                        <button class="p-btn">25%</button><button class="p-btn">50%</button>
+                        <button class="p-btn">75%</button><button class="p-btn">100%</button>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-prime" id="exec-btn" onclick="EngineHelper.execute()">Enter Amount</button>
         </div>
     </main>
 
     <script>
-        // --- 1. CONFIGURATION DATA (BozzDex Identity) ---
-        const BOZZ_CONFIG = {
-            CHAIN: 984,
-            RPC: "https://testnet-rpc2.iopn.tech",
-            ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961", // Spender Lu
-            ASSETS: {
-                WOPN: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84",
-                OPNT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d",
-                tBNB: "0x92cF36713a5622351c9489D5556B90B321873607",
-                tUSDT: "0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b",
-                TETE: "0x771699b159F5DEC9608736DC9C6c901Ddb7Afe3E"
-            }
-        };
-
-        // --- 2. ENGINE LOGIC (V71.0 BASE) ---
-        const SovereignEngine = (() => {
-            const _INTERNAL = {
-                state: {
-                    addr: null, connected: false,
-                    balances: {}, history: []
-                },
-                staticProvider: new ethers.JsonRpcProvider(BOZZ_CONFIG.RPC)
-            };
-
-            return {
-                async boot() {
-                    if(!window.ethereum) return;
-                    try {
-                        const accs = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                        _INTERNAL.state.addr = accs[0];
-                        _INTERNAL.state.connected = true;
-                        
-                        document.getElementById('boot-overlay').style.display = 'none';
-                        document.getElementById('addr-pill').style.display = 'block';
-                        document.getElementById('addr-pill').innerText = accs[0].slice(0,6)+'...'+accs[0].slice(-4);
-                        document.getElementById('btn-connect').style.display = 'none';
-                        
-                        this.hydrate();
-                        setInterval(() => this.hydrate(), 3000); // Auto refresh bray
-                    } catch(e) { console.error(e); }
-                },
-
-                async hydrate() {
-                    if(!_INTERNAL.state.addr) return;
-                    const addr = _INTERNAL.state.addr;
-                    
-                    try {
-                        // Fetch Balances for all assets in config
-                        for(let token in BOZZ_CONFIG.ASSETS) {
-                            const contract = new ethers.Contract(BOZZ_CONFIG.ASSETS[token], ["function balanceOf(address) view returns (uint256)"], _INTERNAL.staticProvider);
-                            const bal = await contract.balanceOf(addr);
-                            _INTERNAL.state.balances[token] = ethers.formatEther(bal);
-                        }
-                        syncUI();
-                    } catch(e) { console.error(e); }
-                },
-
-                disconnect() { location.reload(); }
-            };
-        })();
-
-        // --- 3. UI SYNC & UTILS ---
-        const EngineHelper = {
-            calc() {
-                const val = document.getElementById('amt-in').value;
-                const rate = 1.0254; // Mock rate logic
-                if(val) document.getElementById('amt-out').value = (val * rate).toFixed(6);
-            },
-            flip() {
-                const s1 = document.getElementById('select-in');
-                const s2 = document.getElementById('select-out');
-                const temp = s1.value;
-                s1.value = s2.value;
-                s2.value = temp;
-                this.calc();
-            },
-            async executeSwap() {
-                const amt = document.getElementById('amt-in').value;
-                if(!amt) return;
-                
-                // Add to history UI
-                const hist = document.getElementById('tx-history');
-                const log = `<div class="hist-card"><b>Swap ${amt} ${document.getElementById('select-in').value}</b><br><small>${new Date().toLocaleTimeString()}</small> <span class="status-tag" style="background:rgba(0,255,0,0.1); color:#00ff88;">PENDING</span></div>`;
-                hist.innerHTML = log + hist.innerHTML;
-                
-                alert("Bozz, Transaction Sent to Router: " + BOZZ_CONFIG.ROUTER);
-            }
-        };
-
-        function syncUI() {
-            const balances = SovereignEngine.balances || {}; // Mock access for display
-            // Update balance displays based on selection
-            document.getElementById('price-ref').innerText = "Live: OK (984)";
+        function switchMain(mode) {
+            const isLiq = mode === 'liq';
+            document.getElementById('m-swap').className = isLiq ? 'm-tab' : 'm-tab active';
+            document.getElementById('m-liq').className = isLiq ? 'm-tab active' : 'm-tab';
+            document.getElementById('liq-nav').style.display = isLiq ? 'flex' : 'none';
+            if(!isLiq) switchSub('swap'); // Reset ke swap if tab swap diklik
         }
 
-        function switchMode(m) {
-            document.getElementById('tab-swap').classList.toggle('active', m==='swap');
-            document.getElementById('tab-liq').classList.toggle('active', m==='liq');
+        function switchSub(sub) {
+            const isRem = sub === 'rem';
+            document.getElementById('s-add').className = sub === 'add' ? 's-tab active' : 's-tab';
+            document.getElementById('s-rem').className = isRem ? 's-tab active' : 's-tab';
+            
+            // Atur UI
+            document.getElementById('box-out').style.display = isRem ? 'none' : 'block';
+            document.getElementById('remove-ui').style.display = isRem ? 'block' : 'none';
+            document.getElementById('mid-icon').innerText = isRem ? '↓' : (sub === 'add' ? '+' : '⇅');
+            document.getElementById('exec-btn').innerText = isRem ? 'Remove Liquidity' : (sub === 'add' ? 'Add Liquidity' : 'Swap Asset');
         }
-
-        window.KernelDispatcher = SovereignEngine;
     </script>
 </body>
-    </html>
+</html>
