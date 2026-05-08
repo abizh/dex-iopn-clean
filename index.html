@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>BozzDex Mobile v75.5</title>
+    <title>BozzDex Mobile | Sovereign v75.5</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         :root {
             --bg: #030303; --card: #0f0f0f; --inner: #000000;
             --gold: #d4af37; --gold-dark: #b8860b; --text: #ffffff; --dim: #888;
-            --accent: #a020f0; /* Vibe ungu OPNSwap */
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
         body, html { 
@@ -20,7 +20,6 @@
             overflow: hidden;
         }
 
-        /* Nav Header */
         header {
             position: fixed; top: 0; left: 0; right: 0; height: 70px;
             padding: env(safe-area-inset-top) 20px 0;
@@ -35,7 +34,6 @@
             padding: 15px; overflow-y: auto; display: flex; flex-direction: column;
         }
 
-        /* Tab Utama (Top Level) */
         .main-tabs {
             display: flex; background: var(--inner); border-radius: 20px;
             padding: 5px; margin-bottom: 20px; border: 1px solid #1a1a1a;
@@ -46,14 +44,12 @@
         }
         .m-tab.active { background: #1a1a1a; color: var(--gold); }
 
-        /* Card Container */
         .card {
             background: var(--card); border-radius: 30px; 
             padding: 20px 15px; border: 1px solid #222;
             box-shadow: 0 10px 40px rgba(0,0,0,0.7);
         }
 
-        /* Liquidity Sub-Tabs */
         .sub-nav {
             display: flex; background: var(--inner); border-radius: 15px;
             margin-bottom: 20px; padding: 4px; border: 1px solid #111;
@@ -64,7 +60,6 @@
         }
         .s-tab.active { background: #222; color: #fff; }
 
-        /* Input Native Box */
         .input-group {
             background: var(--inner); border-radius: 22px; padding: 18px;
             border: 1px solid #111; margin-bottom: 8px;
@@ -86,46 +81,63 @@
             font-size: 18px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
-        /* Remove Liquidity Slider */
+        .estimate-info {
+            margin-top: 15px; padding: 12px 15px; background: rgba(255,255,255,0.03);
+            border-radius: 15px; font-size: 11px; color: var(--dim);
+            display: flex; justify-content: space-between; border: 1px solid #1a1a1a;
+        }
+
         .slider-box { padding: 20px 10px; }
         input[type=range] { width: 100%; accent-color: var(--gold); margin: 15px 0; }
         .percent-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .p-btn { background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 8px; border-radius: 10px; font-size: 11px; }
 
-        /* Action Button */
+        /* Tombol Gahar (White with Black Outline) */
         .btn-prime {
             width: 100%; padding: 18px; border-radius: 22px; border: none;
             background: linear-gradient(135deg, var(--gold), var(--gold-dark));
-            color: #000; font-weight: 900; font-size: 16px; margin-top: 20px;
+            color: #ffffff;
+            font-weight: 900; font-size: 18px; margin-top: 20px;
+            text-transform: uppercase; letter-spacing: 1.5px;
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
         }
+        .btn-prime:active { transform: scale(0.98); filter: brightness(0.9); }
     </style>
 </head>
 <body>
 
     <header>
         <div class="brand">BOZZ<span style="color:#fff">DEX</span></div>
-        <div id="wallet" style="background:#1a1a1a; padding:8px 12px; border-radius:12px; font-size:11px; font-weight:bold; border:1px solid #333;">0x6666...1af4</div>
+        <div id="wallet-btn" onclick="KernelDispatcher.boot()" style="background:#1a1a1a; padding:8px 12px; border-radius:12px; font-size:11px; font-weight:bold; border:1px solid #333; color: var(--gold); min-width: 120px; text-align: center;">CONNECT WALLET</div>
     </header>
 
     <main>
         <div class="main-tabs">
-            <div class="m-tab active" id="m-swap" onclick="switchMain('swap')">Swap</div>
-            <div class="m-tab" id="m-liq" onclick="switchMain('liq')">Liquidity</div>
+            <div class="m-tab active" id="m-swap" onclick="UIBridge.switchMain('swap')">Swap</div>
+            <div class="m-tab" id="m-liq" onclick="UIBridge.switchMain('liq')">Liquidity</div>
         </div>
 
         <div class="card">
             <div id="liq-nav" class="sub-nav" style="display: none;">
-                <div class="s-tab active" id="s-add" onclick="switchSub('add')">Add Liquidity</div>
-                <div class="s-tab" id="s-rem" onclick="switchSub('rem')">Remove Liquidity</div>
+                <div class="s-tab active" id="s-add" onclick="UIBridge.switchSub('add')">Add Liquidity</div>
+                <div class="s-tab" id="s-rem" onclick="UIBridge.switchSub('rem')">Remove Liquidity</div>
             </div>
 
-            <div id="dynamic-content">
+            <div id="form-content">
                 <div class="input-group">
-                    <div class="meta"><span>From / Input</span><span>Balance: <b id="bal-in">0.00</b></span></div>
+                    <div class="meta">
+                        <span id="lbl-in">Pay</span>
+                        <span>Balance: <b id="bal-in" style="color:#fff">0.00</b> <small style="color:var(--gold); margin-left:5px" onclick="UIBridge.setMax()">MAX</small></span>
+                    </div>
                     <div class="row">
-                        <input type="number" id="amt-in" placeholder="0.0">
+                        <input type="number" id="amt-in" placeholder="0.0" oninput="UIBridge.calc()">
                         <div class="token-pill">
-                            <select id="sel-in"><option>WOPN</option><option>OPNT</option></select>
+                            <select id="sel-in" onchange="UIBridge.calc()">
+                                <option value="WOPN">WOPN</option>
+                                <option value="OPNT">OPNT</option>
+                                <option value="tUSDT">tUSDT</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -133,49 +145,218 @@
                 <div class="divider"><div class="circle-btn" id="mid-icon">⇅</div></div>
 
                 <div class="input-group" style="margin-top: 10px;" id="box-out">
-                    <div class="meta"><span>To / Input</span><span>Balance: <b id="bal-out">0.00</b></span></div>
+                    <div class="meta">
+                        <span id="lbl-out">Receive (Estimate)</span>
+                        <span>Balance: <b id="bal-out" style="color:#fff">0.00</b></span>
+                    </div>
                     <div class="row">
-                        <input type="number" id="amt-out" placeholder="0.0">
+                        <input type="number" id="amt-out" placeholder="0.0" readonly>
                         <div class="token-pill">
-                            <select id="sel-out"><option>OPNT</option><option>WOPN</option></select>
+                            <select id="sel-out" onchange="UIBridge.calc()">
+                                <option value="OPNT">OPNT</option>
+                                <option value="WOPN">WOPN</option>
+                                <option value="TETE">TETE</option>
+                            </select>
                         </div>
                     </div>
                 </div>
 
+                <div id="swap-info-box" class="estimate-info" style="display: none;">
+                    <span>Minimum Received:</span>
+                    <b id="min-received" style="color: #fff;">0.00 OPNT</b>
+                </div>
+
                 <div id="remove-ui" class="slider-box" style="display: none;">
-                    <div class="meta"><span>Amount to Remove: <b id="range-val">25%</b></span></div>
-                    <input type="range" min="0" max="100" value="25" oninput="document.getElementById('range-val').innerText = this.value + '%'">
+                    <div class="meta"><span>Amount to Remove: <b id="range-val" style="color:var(--gold)">25%</b></span></div>
+                    <input type="range" id="rem-range" min="0" max="100" value="25" oninput="UIBridge.updateRange(this.value)">
                     <div class="percent-grid">
-                        <button class="p-btn">25%</button><button class="p-btn">50%</button>
-                        <button class="p-btn">75%</button><button class="p-btn">100%</button>
+                        <button class="p-btn" onclick="UIBridge.updateRange(25)">25%</button>
+                        <button class="p-btn" onclick="UIBridge.updateRange(50)">50%</button>
+                        <button class="p-btn" onclick="UIBridge.updateRange(75)">75%</button>
+                        <button class="p-btn" onclick="UIBridge.updateRange(100)">100%</button>
                     </div>
                 </div>
             </div>
 
-            <button class="btn-prime" id="exec-btn" onclick="EngineHelper.execute()">Enter Amount</button>
+            <button class="btn-prime" id="exec-btn" onclick="UIBridge.handleExecute()">Enter Amount</button>
         </div>
     </main>
 
     <script>
-        function switchMain(mode) {
-            const isLiq = mode === 'liq';
-            document.getElementById('m-swap').className = isLiq ? 'm-tab' : 'm-tab active';
-            document.getElementById('m-liq').className = isLiq ? 'm-tab active' : 'm-tab';
-            document.getElementById('liq-nav').style.display = isLiq ? 'flex' : 'none';
-            if(!isLiq) switchSub('swap'); // Reset ke swap if tab swap diklik
-        }
+        /**
+         * SOVEREIGN ENGINE v71.5 - BOZZDEX
+         */
+        const SovereignEngine = (() => {
+            const _CONFIG = Object.freeze({
+                CHAIN_ID: 984,
+                RPC: "https://testnet-rpc2.iopn.tech",
+                ROUTER_BOZZ: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
+                ASSETS: {
+                    WOPN: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84",
+                    OPNT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d",
+                    tUSDT: "0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b",
+                    tBNB: "0x92cF36713a5622351c9489D5556B90B321873607",
+                    TETE: "0x771699b159F5DEC9608736DC9C6c901Ddb7Afe3E"
+                },
+                HEARTBEAT_INTERVAL: 3000
+            });
 
-        function switchSub(sub) {
-            const isRem = sub === 'rem';
-            document.getElementById('s-add').className = sub === 'add' ? 's-tab active' : 's-tab';
-            document.getElementById('s-rem').className = isRem ? 's-tab active' : 's-tab';
-            
-            // Atur UI
-            document.getElementById('box-out').style.display = isRem ? 'none' : 'block';
-            document.getElementById('remove-ui').style.display = isRem ? 'block' : 'none';
-            document.getElementById('mid-icon').innerText = isRem ? '↓' : (sub === 'add' ? '+' : '⇅');
-            document.getElementById('exec-btn').innerText = isRem ? 'Remove Liquidity' : (sub === 'add' ? 'Add Liquidity' : 'Swap Asset');
-        }
+            const _INTERNAL = {
+                state: {
+                    vault: { address: null, balances: { WOPN: "0", OPNT: "0", tUSDT: "0", OPN: "0" } },
+                    kernel: { status: "IDLE", txQueue: [], slippage: 0.5, currentRate: 0.24 }
+                },
+                staticProvider: new ethers.JsonRpcProvider(_CONFIG.RPC),
+                inflightHydration: false
+            };
+
+            const _core = {
+                mutate(updates) {
+                    updates.forEach(([path, value]) => {
+                        const keys = path.split('.');
+                        let target = _INTERNAL.state;
+                        for (let i = 0; i < keys.length - 1; i++) target = target[keys[i]];
+                        target[keys[keys.length - 1]] = value;
+                    });
+                    this.notifyUI();
+                },
+                notifyUI() {
+                    const st = _INTERNAL.state;
+                    // Update Header Wallet
+                    if(st.vault.address) {
+                        document.getElementById('wallet-btn').innerText = st.vault.address.slice(0,6) + "..." + st.vault.address.slice(-4);
+                    }
+                    // Sync Balances
+                    const sIn = document.getElementById('sel-in').value;
+                    const sOut = document.getElementById('sel-out').value;
+                    document.getElementById('bal-in').innerText = parseFloat(st.vault.balances[sIn] || 0).toFixed(4);
+                    document.getElementById('bal-out').innerText = parseFloat(st.vault.balances[sOut] || 0).toFixed(4);
+                    
+                    // Status Button
+                    const btn = document.getElementById('exec-btn');
+                    if(st.kernel.status !== "IDLE") btn.innerText = st.kernel.status + "...";
+                }
+            };
+
+            return {
+                async execute(payload) {
+                    if (_INTERNAL.state.kernel.status !== "IDLE") return;
+                    _core.mutate([['kernel.status', 'APPROVING']]);
+                    try {
+                        const provider = new ethers.BrowserProvider(window.ethereum);
+                        const signer = await provider.getSigner();
+                        const tokenContract = new ethers.Contract(_CONFIG.ASSETS[payload.tokenIn], 
+                            ["function approve(address,uint256) returns (bool)"], signer);
+                        const tx = await tokenContract.approve(_CONFIG.ROUTER_BOZZ, ethers.parseUnits(payload.amount, 18));
+                        _core.mutate([['kernel.status', 'SIGNING']]);
+                        await tx.wait();
+                        this.finalize(tx.hash, payload.tokenIn, "SUCCESS");
+                    } catch (err) {
+                        this.finalize(null, "TX", "FAILED", err.message);
+                    }
+                },
+
+                async hydrate() {
+                    const addr = _INTERNAL.state.vault.address;
+                    if (!addr || _INTERNAL.inflightHydration) return;
+                    _INTERNAL.inflightHydration = true;
+                    try {
+                        const results = {};
+                        const native = await _INTERNAL.staticProvider.getBalance(addr);
+                        results['OPN'] = ethers.formatEther(native);
+                        const calls = Object.entries(_CONFIG.ASSETS).map(async ([symbol, ca]) => {
+                            const contract = new ethers.Contract(ca, ["function balanceOf(address) view returns (uint256)"], _INTERNAL.staticProvider);
+                            const bal = await contract.balanceOf(addr);
+                            results[symbol] = ethers.formatEther(bal);
+                        });
+                        await Promise.all(calls);
+                        _core.mutate([['vault.balances', results]]);
+                    } finally { _INTERNAL.inflightHydration = false; }
+                },
+
+                finalize(hash, type, status) {
+                    _core.mutate([['kernel.status', 'IDLE']]);
+                    this.hydrate();
+                    if(status === "SUCCESS") alert("Transaction Success!");
+                },
+
+                boot: async function() {
+                    if (!window.ethereum) return alert("Please use a Web3 Browser");
+                    const accs = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    _core.mutate([['vault.address', accs[0]]]);
+                    
+                    window.ethereum.on('accountsChanged', (a) => {
+                        _core.mutate([['vault.address', a[0]]]);
+                        this.hydrate();
+                    });
+
+                    setInterval(() => this.hydrate(), _CONFIG.HEARTBEAT_INTERVAL);
+                    this.hydrate();
+                    console.log("%c BOZZDEX ONLINE ", "background:#d4af37;color:#000;font-weight:bold;");
+                }
+            };
+        })();
+
+        /**
+         * UI BRIDGE & LOGIC
+         */
+        const UIBridge = {
+            switchMain(mode) {
+                const isLiq = mode === 'liq';
+                document.getElementById('m-swap').classList.toggle('active', !isLiq);
+                document.getElementById('m-liq').classList.toggle('active', isLiq);
+                document.getElementById('liq-nav').style.display = isLiq ? 'flex' : 'none';
+                this.switchSub(isLiq ? 'add' : 'swap');
+            },
+            switchSub(sub) {
+                const isRem = sub === 'rem';
+                const isSwap = sub === 'swap';
+                if(!isSwap) {
+                    document.getElementById('s-add').className = sub === 'add' ? 's-tab active' : 's-tab';
+                    document.getElementById('s-rem').className = isRem ? 's-tab active' : 's-tab';
+                }
+                document.getElementById('box-out').style.display = isRem ? 'none' : 'block';
+                document.getElementById('remove-ui').style.display = isRem ? 'block' : 'none';
+                document.getElementById('swap-info-box').style.display = 'none';
+                document.getElementById('mid-icon').innerText = isRem ? '↓' : (sub === 'add' ? '+' : '⇅');
+                
+                const btn = document.getElementById('exec-btn');
+                if(isSwap) btn.innerText = "Swap Asset";
+                else btn.innerText = isRem ? "Remove Liquidity" : "Add Liquidity";
+            },
+            calc() {
+                const val = document.getElementById('amt-in').value;
+                const isSwap = document.getElementById('m-swap').classList.contains('active');
+                if(val > 0 && isSwap) {
+                    const est = val * 1.025; // Dummy Rate 
+                    document.getElementById('amt-out').value = est.toFixed(4);
+                    document.getElementById('swap-info-box').style.display = 'flex';
+                    document.getElementById('min-received').innerText = (est * 0.995).toFixed(4) + " " + document.getElementById('sel-out').value;
+                } else {
+                    document.getElementById('swap-info-box').style.display = 'none';
+                    document.getElementById('amt-out').value = '';
+                }
+            },
+            setMax() {
+                document.getElementById('amt-in').value = document.getElementById('bal-in').innerText;
+                this.calc();
+            },
+            updateRange(v) {
+                document.getElementById('rem-range').value = v;
+                document.getElementById('range-val').innerText = v + '%';
+            },
+            handleExecute() {
+                const amt = document.getElementById('amt-in').value;
+                if(!amt || amt <= 0) return alert("Enter Amount!");
+                SovereignEngine.execute({
+                    amount: amt,
+                    tokenIn: document.getElementById('sel-in').value,
+                    tokenOut: document.getElementById('sel-out').value
+                });
+            }
+        };
+
+        window.KernelDispatcher = SovereignEngine;
     </script>
 </body>
 </html>
