@@ -1,227 +1,354 @@
 /**
- * SOVEREIGN ENGINE v75.5 - BOZZDEX MASTER BUILD
- * Sinkronisasi penuh dengan UI Premium (Teks Putih Outline Hitam)
+ * SOVEREIGN ENGINE v90.8 - THE FINAL SENTINEL (Standalone JS)
+ * Protokol: Deep Sleep, Adaptive Backoff, Epoch Guard, & Forensic Mapping
  */
 
 const SovereignEngine = (() => {
-    // --- 1. CORE CONFIGURATION ---
+    // --- 1. KONFIGURASI MISI ---
     const _CONFIG = Object.freeze({
-        CHAIN_ID: 984,
-        RPC: "https://testnet-rpc2.iopn.tech",
-        ROUTER_BOZZ: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
+        ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
+        WOPN: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84",
+        ROUTER_ABI: [
+            "function getAmountsOut(uint amtIn, address[] path) view returns (uint[] amts)",
+            "function swapExactTokensForTokensSupportingFeeOnTransferTokens(uint amtIn, uint amtOutMin, address[] path, address to, uint deadline)",
+            "function swapExactETHForTokensSupportingFeeOnTransferTokens(uint amtOutMin, address[] path, address to, uint deadline) payable",
+            "function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amtIn, uint amtOutMin, address[] path, address to, uint deadline)"
+        ],
         ASSETS: {
-            WOPN: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84",
-            OPNT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d",
-            tUSDT: "0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b",
-            tBNB: "0x92cF36713a5622351c9489D5556B90B321873607",
-            TETE: "0x771699b159F5DEC9608736DC9C6c901Ddb7Afe3E"
-        },
-        HEARTBEAT_INTERVAL: 3000 // Refresh balance tiap 3 detik
+            OPN:   { addr: "NATIVE", dec: 18, slip: 2 },
+            WOPN:  { addr: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84", dec: 18, slip: 1 },
+            OPNT:  { addr: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d", dec: 18, slip: 3 },
+            tUSDT: { addr: "0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b", dec: 18, slip: 2 },
+            PRET:  { addr: "0xEcbf04b23f5b15492794dE22Da5A9819b60B88FD", dec: 18, slip: 12, hasFee: true }
+        }
     });
 
-    // --- 2. INTERNAL STATE ---
-    const _INTERNAL = {
-        state: {
-            vault: { address: null, balances: {} },
-            kernel: { status: "IDLE", currentRate: 1.025 } // Dummy rate 1:1.025 buat simulasi
-        },
-        staticProvider: new ethers.JsonRpcProvider(_CONFIG.RPC),
-        inflightHydration: false
+    // --- 2. INTERNAL STATE & REGISTRY ---
+    let _hydrateEpoch = 0;
+    let _notifyToken = 0;
+    let _consecutiveFails = 0;
+    let _pollTimeout = null;
+    let _savedLogs = [];
+    
+    try { 
+        _savedLogs = JSON.parse(localStorage.getItem('bozzdex_v90_logs')) || []; 
+    } catch(e) { 
+        _savedLogs = []; 
+    }
+
+    const _STATE = { 
+        address: null, 
+        balances: {}, 
+        status: "IDLE", 
+        error: "", 
+        message: "", 
+        logs: _savedLogs 
     };
 
-    // --- 3. CORE LOGIC ---
+    let _provider = window.ethereum ? new ethers.BrowserProvider(window.ethereum) : null;
+
+    // --- 3. CORE UTILITIES (The Black Box & Engines) ---
     const _core = {
-        mutate(updates) {
-            updates.forEach(([path, value]) => {
-                const keys = path.split('.');
-                let target = _INTERNAL.state;
-                for (let i = 0; i < keys.length - 1; i++) target = target[keys[i]];
-                target[keys[keys.length - 1]] = value;
-            });
-            this.syncUI();
+        async fetchRawBalance(sym, provider, address) {
+            const asset = _CONFIG.ASSETS[sym];
+            if (asset.addr === "NATIVE") return await provider.getBalance(address);
+            const contract = new ethers.Contract(asset.addr, ["function balanceOf(address) view returns (uint256)"], provider);
+            return await contract.balanceOf(address);
         },
-        syncUI() {
-            const st = _INTERNAL.state;
-            
-            // 1. Sync Wallet Header
-            const walletBtn = document.getElementById('wallet-btn');
-            if (st.vault.address && walletBtn) {
-                walletBtn.innerText = st.vault.address.slice(0,6) + "..." + st.vault.address.slice(-4);
-                walletBtn.style.color = "#fff";
-            }
 
-            // 2. Sync Balances ke ID bal-in dan bal-out
-            const symIn = document.getElementById('sel-in')?.value;
-            const symOut = document.getElementById('sel-out')?.value;
-            
-            if (symIn && document.getElementById('bal-in')) {
-                document.getElementById('bal-in').innerText = parseFloat(st.vault.balances[symIn] || 0).toFixed(4);
-            }
-            if (symOut && document.getElementById('bal-out')) {
-                document.getElementById('bal-out').innerText = parseFloat(st.vault.balances[symOut] || 0).toFixed(4);
-            }
+        async getValidatedPath(sIn, sOut, amtWei) {
+            const aIn = _CONFIG.ASSETS[sIn].addr === "NATIVE" ? _CONFIG.WOPN : _CONFIG.ASSETS[sIn].addr;
+            const aOut = _CONFIG.ASSETS[sOut].addr === "NATIVE" ? _CONFIG.WOPN : _CONFIG.ASSETS[sOut].addr;
+            const direct = [aIn, aOut];
+            const bridge = [aIn, _CONFIG.WOPN, aOut];
+            try {
+                const r = new ethers.Contract(_CONFIG.ROUTER, _CONFIG.ROUTER_ABI, _provider);
+                const q = await r.getAmountsOut(amtWei, direct);
+                if (q[1] > 0n) return direct;
+            } catch (e) {}
+            return bridge;
+        },
 
-            // 3. Sync Status Button
-            const btn = document.getElementById('exec-btn');
-            if (btn) {
-                if (st.kernel.status !== "IDLE") {
-                    btn.innerText = st.kernel.status + "...";
-                    btn.style.opacity = "0.7";
-                } else {
-                    // Balikin teks sesuai mode aktif
-                    const isSwap = document.getElementById('m-swap').classList.contains('active');
-                    const isRem = document.getElementById('s-rem')?.classList.contains('active');
-                    btn.innerText = isSwap ? "Swap Asset" : (isRem ? "Remove Liquidity" : "Add Liquidity");
-                    btn.style.opacity = "1";
-                }
+        saveLog(entry) {
+            try {
+                const atomicEntry = { 
+                    ts: Date.now(), 
+                    time: new Date().toLocaleTimeString(), 
+                    ...entry 
+                };
+                _STATE.logs.unshift(atomicEntry);
+                if (_STATE.logs.length > 20) _STATE.logs.pop();
+                localStorage.setItem('bozzdex_v90_logs', JSON.stringify(_STATE.logs));
+            } catch (e) { console.warn("Black Box Full"); }
+        },
+
+        notify(msg, type = "INFO") {
+            const token = ++_notifyToken;
+            if (type === "ERR") {
+                _STATE.error = msg;
+                _STATE.message = "";
+            } else {
+                _STATE.message = msg;
+                _STATE.error = "";
+                // Auto-clear message (not error) after 7s if not replaced
+                setTimeout(() => {
+                    if (_notifyToken === token) {
+                        _STATE.message = "";
+                        SovereignEngine.render();
+                    }
+                }, 7000);
             }
+            SovereignEngine.render();
+        },
+
+        getFleetIntelligence() {
+            if (_STATE.logs.length === 0) return { health: "STANDBY", lastSuccess: "NONE", lastHeartbeat: "NONE", count: 0 };
+            const sorted = [..._STATE.logs].sort((a, b) => b.ts - a.ts);
+            const window = sorted.slice(0, 10);
+            const fails = window.filter(l => l.status === "FAILED").length;
+            
+            let h = "OPERATIONAL";
+            if (fails >= 4) h = "CRITICAL"; 
+            else if (fails >= 2) h = "WARNING";
+
+            return { 
+                health: h, 
+                lastSuccess: sorted.find(l => l.status === "SUCCESS")?.time || "NEVER", 
+                lastHeartbeat: sorted[0]?.time || "NONE", 
+                count: _STATE.logs.length 
+            };
         }
     };
 
-    // --- 4. PUBLIC API ---
+    // --- 4. PUBLIC NAVIGATOR ---
     return {
-        // Tarik semua saldo asset
         async hydrate() {
-            const addr = _INTERNAL.state.vault.address;
-            if (!addr || _INTERNAL.inflightHydration) return;
+            if (_pollTimeout) clearTimeout(_pollTimeout);
             
-            _INTERNAL.inflightHydration = true;
+            // DEEP SLEEP PROTOCOL: Zero-Pulse when hidden
+            if (document.hidden || !_STATE.address || !_provider) {
+                console.log("SENTINEL_HIBERNATION: Active (Pulse Stopped)");
+                return;
+            }
+
+            const epoch = ++_hydrateEpoch;
+            const res = {};
             try {
-                const results = {};
-                const calls = Object.entries(_CONFIG.ASSETS).map(async ([symbol, ca]) => {
-                    const contract = new ethers.Contract(ca, ["function balanceOf(address) view returns (uint256)"], _INTERNAL.staticProvider);
-                    const bal = await contract.balanceOf(addr);
-                    results[symbol] = ethers.formatEther(bal);
-                });
-                await Promise.all(calls);
-                _core.mutate([['vault.balances', results]]);
+                for (const s of Object.keys(_CONFIG.ASSETS)) {
+                    if (epoch !== _hydrateEpoch) return;
+                    const bal = await _core.fetchRawBalance(s, _provider, _STATE.address);
+                    res[s] = ethers.formatUnits(bal, _CONFIG.ASSETS[s].dec);
+                }
+                
+                if (epoch !== _hydrateEpoch) return;
+                _STATE.balances = res;
+                _consecutiveFails = 0; // Reset network health
+                this.render();
             } catch (e) {
-                console.error("Hydration Error", e);
+                _consecutiveFails++;
+                if (_consecutiveFails >= 3) _core.notify("NETWORK_UNSTABLE", "ERR");
+                console.warn(`HYDRATE_FAIL_${_consecutiveFails}`);
             } finally {
-                _INTERNAL.inflightHydration = false;
+                // Ensure pulse continues only if still visible
+                if (!document.hidden) this.scheduleHydrate();
             }
         },
 
-        // Eksekusi Transaction (Approve + Logic)
-        async execute(payload) {
-            if (_INTERNAL.state.kernel.status !== "IDLE") return;
+        scheduleHydrate() {
+            if (document.hidden) return;
+            // ADAPTIVE BACKOFF: 5s -> 10s -> 20s -> 60s
+            let delay = 5000;
+            if (_consecutiveFails === 1) delay = 10000;
+            else if (_consecutiveFails === 2) delay = 20000;
+            else if (_consecutiveFails >= 3) delay = 60000;
+
+            _pollTimeout = setTimeout(() => this.hydrate(), delay);
+        },
+
+        render() {
+            const sIn = document.getElementById('sel-in').value;
+            const sOut = document.getElementById('sel-out').value;
             
-            _core.mutate([['kernel.status', 'APPROVING']]);
-            try {
-                const provider = new ethers.BrowserProvider(window.ethereum);
-                const signer = await provider.getSigner();
-                const tokenContract = new ethers.Contract(_CONFIG.ASSETS[payload.tokenIn], [
-                    "function approve(address,uint256) returns (bool)"
-                ], signer);
+            // UI Element Updates
+            const bIn = document.getElementById('bal-in');
+            const bOut = document.getElementById('bal-out');
+            if (bIn) bIn.innerText = parseFloat(_STATE.balances[sIn] || 0).toFixed(4);
+            if (bOut) bOut.innerText = parseFloat(_STATE.balances[sOut] || 0).toFixed(4);
+            
+            const k = document.getElementById('kernelState');
+            if (k) {
+                if (_STATE.error) {
+                    k.innerText = `[!] ALERT: ${_STATE.error}`;
+                    k.className = "status-pill status-bad";
+                } else if (_STATE.message) {
+                    k.innerText = `[*] INFO: ${_STATE.message}`;
+                    k.className = "status-pill status-ok";
+                } else {
+                    k.innerText = `SYSTEM: ${_STATE.status}`;
+                    k.className = "status-pill status-ok";
+                }
+            }
 
-                const tx = await tokenContract.approve(_CONFIG.ROUTER_BOZZ, ethers.parseUnits(payload.amount, 18));
-                
-                _core.mutate([['kernel.status', 'SIGNING']]);
-                await tx.wait();
-                
-                alert("SUCCESS: Spender Approved & Swap Initiated!");
-            } catch (err) {
-                alert("FAILED: " + err.message);
-            } finally {
-                _core.mutate([['kernel.status', 'IDLE']]);
-                this.hydrate();
+            const btn = document.getElementById('exec-btn');
+            if (btn) btn.disabled = (_STATE.status !== "IDLE" || sIn === sOut);
+
+            // Fleet Radar Rendering
+            const intel = _core.getFleetIntelligence();
+            const fleet = document.getElementById('fleet-overview');
+            if (fleet) {
+                const assets = ['OPN', 'PRET', 'tUSDT'];
+                fleet.innerHTML = `
+                    <div class="fleet-status-bar">
+                        <span style="color:${intel.health==='CRITICAL'?'#ff4444':intel.health==='WARNING'?'#ffcc00':'#00ff88'}">● ${intel.health}</span>
+                        <span style="color:#555">HB: ${intel.lastHeartbeat} | MIS: ${intel.count}</span>
+                    </div>
+                    <div class="fleet-grid">
+                        ${assets.map(s => `
+                            <div class="fleet-card ${s==='PRET'?'focus':'active'}">
+                                <span>${s} POS</span>
+                                <b>${parseFloat(_STATE.balances[s]||0).toFixed(3)}</b>
+                            </div>`).join('')}
+                    </div>
+                `;
+            }
+
+            // Forensic Logbook Rendering
+            const logBox = document.getElementById('log-history');
+            if (logBox) {
+                logBox.innerHTML = _STATE.logs.map(log => 
+                    log.status === "SUCCESS" ? 
+                    `<div class="log-item"><span class="tag-success">SUCCESS</span><span>${log.pair} | +${log.net}</span><a class="log-hash" href="https://testnet.iopn.tech/tx/${log.hash}" target="_blank">🔗</a></div>` :
+                    `<div class="log-item failed"><span class="tag-fail">${log.phase}</span><span>${log.reason}</span></div>`
+                ).join('');
             }
         },
 
-        boot: async function() {
-            if (window.__SOVEREIGN_LOADED__ || !window.ethereum) return;
+        async execute() {
+            if (_STATE.status !== "IDLE") return;
+            
+            // Path Sterilization
+            _STATE.error = ""; _STATE.message = "";
+            const sIn = document.getElementById('sel-in').value;
+            const sOut = document.getElementById('sel-out').value;
+            const val = document.getElementById('amt-in').value;
+            let currentPhase = "PRE-FLIGHT";
+
+            if (!val || val <= 0) return _core.notify("INVALID_AMOUNT", "ERR");
+
             try {
-                const accs = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                _core.mutate([['vault.address', accs[0]]]);
+                const signer = await _provider.getSigner();
+                const router = new ethers.Contract(_CONFIG.ROUTER, _CONFIG.ROUTER_ABI, signer);
+                const amtWei = ethers.parseUnits(val, _CONFIG.ASSETS[sIn].dec);
 
-                // Auto Refresh
-                setInterval(() => this.hydrate(), _CONFIG.HEARTBEAT_INTERVAL);
-                this.hydrate();
+                currentPhase = "ROUTING"; _STATE.status = currentPhase; this.render();
+                const path = await _core.getValidatedPath(sIn, sOut, amtWei);
 
-                window.__SOVEREIGN_LOADED__ = true;
-                console.log("%c BOZZDEX ENGINE ONLINE ", "background:#d4af37;color:#000;font-weight:bold;");
-            } catch (e) { console.error("Boot failed", e); }
+                currentPhase = "QUOTING"; _STATE.status = currentPhase; this.render();
+                const quotes = await router.getAmountsOut(amtWei, path);
+                let qOut = quotes[quotes.length - 1];
+                
+                // Fee-on-transfer protection
+                if (_CONFIG.ASSETS[sIn].hasFee || _CONFIG.ASSETS[sOut].hasFee) qOut = (qOut * 92n) / 100n;
+                const minOut = (qOut * BigInt(100 - (_CONFIG.ASSETS[sOut].slip || 5))) / 100n;
+
+                const balBefore = await _core.fetchRawBalance(sOut, _provider, _STATE.address);
+
+                // Approval Logic
+                if (_CONFIG.ASSETS[sIn].addr !== "NATIVE") {
+                    currentPhase = "APPROVING"; _STATE.status = currentPhase; this.render();
+                    const tok = new ethers.Contract(_CONFIG.ASSETS[sIn].addr, ["function approve(address,uint256) returns (bool)"], signer);
+                    const txApp = await tok.approve(_CONFIG.ROUTER, amtWei);
+                    await txApp.wait();
+                }
+
+                currentPhase = "SWAPPING"; _STATE.status = currentPhase; this.render();
+                const deadline = Math.floor(Date.now() / 1000) + 1200;
+                let tx;
+                
+                if (sIn === "OPN") {
+                    tx = await router.swapExactETHForTokensSupportingFeeOnTransferTokens(minOut, path, _STATE.address, deadline, { value: amtWei });
+                } else if (sOut === "OPN") {
+                    tx = await router.swapExactTokensForETHSupportingFeeOnTransferTokens(amtWei, minOut, path, _STATE.address, deadline);
+                } else {
+                    tx = await router.swapExactTokensForTokensSupportingFeeOnTransferTokens(amtWei, minOut, path, _STATE.address, deadline);
+                }
+
+                _STATE.status = "MINING"; this.render();
+                const receipt = await tx.wait();
+
+                // Diff Calculation
+                const balAfter = await _core.fetchRawBalance(sOut, _provider, _STATE.address);
+                let diff = balAfter - balBefore;
+                if (sOut === "OPN") {
+                    const gasUsed = receipt.gasUsed * (receipt.effectiveGasPrice || receipt.gasPrice);
+                    diff += gasUsed;
+                }
+
+                _core.saveLog({ 
+                    pair: `${sIn}→${sOut}`, 
+                    net: ethers.formatUnits(diff, _CONFIG.ASSETS[sOut].dec).slice(0, 8), 
+                    hash: receipt.hash, 
+                    status: "SUCCESS" 
+                });
+                
+                _STATE.status = "SUCCESS";
+                _core.notify("MISSION ACCOMPLISHED", "OK");
+
+            } catch (e) {
+                // Forensic Mapping
+                const isReject = e.code === "ACTION_REJECTED" || e.code === 4001;
+                const isNetwork = e.code === "NETWORK_ERROR" || e.message?.includes("network") || e.cause?.code === "ECONNREFUSED";
+                
+                const actor = isReject ? "USER_ABORT" : (isNetwork ? "NETWORK_FAIL" : "CONTRACT_REVERT");
+                const reason = e.shortMessage || e.reason || e.message || "UNKNOWN";
+
+                _core.saveLog({ 
+                    pair: `${sIn}→${sOut}`, 
+                    phase: currentPhase, 
+                    reason: `${actor}: ${reason.slice(0, 20)}`, 
+                    status: "FAILED" 
+                });
+                
+                _core.notify(`${actor} @ ${currentPhase}`, "ERR");
+                _STATE.status = "ERROR";
+            } finally {
+                // Post-mission cooldown
+                setTimeout(() => { 
+                    _STATE.status = "IDLE"; 
+                    _STATE.error = ""; 
+                    this.hydrate(); 
+                }, 5000);
+            }
+        },
+
+        boot() {
+            if (!_provider) {
+                _core.notify("WEB3_PROVIDER_MISSING", "ERR");
+                return;
+            }
+
+            // Sync with Environment
+            window.ethereum.on('accountsChanged', () => window.location.reload());
+            window.ethereum.on('chainChanged', () => window.location.reload());
+            
+            // Immediate Recovery Protocol
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    console.log("SENTINEL_WAKE: Immediate Recovery");
+                    this.hydrate();
+                }
+            });
+
+            // Initial Login
+            window.ethereum.request({ method: 'eth_requestAccounts' }).then(accs => {
+                _STATE.address = accs[0];
+                this.hydrate(); // Start Adaptive Polling
+            }).catch(() => {
+                _core.notify("CONNECTION_REJECTED", "ERR");
+            });
         }
     };
 })();
 
-/**
- * UI BRIDGE (Logika Interaksi Layar)
- */
-const UIBridge = {
-    // Switch antara Swap dan Liquidity
-    switchMain(mode) {
-        const isLiq = mode === 'liq';
-        document.getElementById('m-swap').classList.toggle('active', !isLiq);
-        document.getElementById('m-liq').classList.toggle('active', isLiq);
-        document.getElementById('liq-nav').style.display = isLiq ? 'flex' : 'none';
-        this.switchSub(isLiq ? 'add' : 'swap');
-    },
-
-    // Switch antara Add dan Remove Liq
-    switchSub(sub) {
-        const isRem = sub === 'rem';
-        const isSwap = sub === 'swap';
-        
-        if(!isSwap) {
-            document.getElementById('s-add').className = sub === 'add' ? 's-tab active' : 's-tab';
-            document.getElementById('s-rem').className = isRem ? 's-tab active' : 's-tab';
-        }
-
-        document.getElementById('box-out').style.display = isRem ? 'none' : 'block';
-        document.getElementById('remove-ui').style.display = isRem ? 'block' : 'none';
-        document.getElementById('swap-info-box').style.display = 'none';
-        document.getElementById('mid-icon').innerText = isRem ? '↓' : (sub === 'add' ? '+' : '⇅');
-        
-        const btn = document.getElementById('exec-btn');
-        btn.innerText = isSwap ? "Swap Asset" : (isRem ? "Remove Liquidity" : "Add Liquidity");
-    },
-
-    // Hitung estimasi minOut real-time
-    calc() {
-        const amtIn = document.getElementById('amt-in').value;
-        const isSwap = document.getElementById('m-swap').classList.contains('active');
-        
-        if (amtIn > 0 && isSwap) {
-            // Simulasi rate 1:1.025
-            const estOut = amtIn * 1.025;
-            const minOut = estOut * 0.995; // Slippage 0.5%
-            
-            document.getElementById('amt-out').value = estOut.toFixed(6);
-            document.getElementById('swap-info-box').style.display = 'flex';
-            document.getElementById('min-received').innerText = minOut.toFixed(6) + " " + document.getElementById('sel-out').value;
-        } else {
-            document.getElementById('swap-info-box').style.display = 'none';
-            document.getElementById('amt-out').value = '';
-        }
-    },
-
-    setMax() {
-        const bal = document.getElementById('bal-in').innerText;
-        document.getElementById('amt-in').value = bal;
-        this.calc();
-    },
-
-    updateRange(v) {
-        document.getElementById('rem-range').value = v;
-        document.getElementById('range-val').innerText = v + '%';
-    },
-
-    handleExecute() {
-        const amt = document.getElementById('amt-in').value;
-        if (!amt || amt <= 0) return alert("Enter Amount!");
-        
-        SovereignEngine.execute({
-            amount: amt,
-            tokenIn: document.getElementById('sel-in').value,
-            tokenOut: document.getElementById('sel-out').value
-        });
-    }
-};
-
-// Global Entry
-window.KernelDispatcher = SovereignEngine;
-window.UIHelper = UIBridge;
-
-// Auto-boot
+// Initiate Engine
 SovereignEngine.boot();

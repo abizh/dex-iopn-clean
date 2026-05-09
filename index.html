@@ -1,362 +1,351 @@
+index.html MASTER BUILD v90.8: 
+THE SOVEREIGN SENTINEL
+
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>BozzDex Mobile | Sovereign v75.5</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOVEREIGN SENTINEL v90.8</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
-        :root {
-            --bg: #030303; --card: #0f0f0f; --inner: #000000;
-            --gold: #d4af37; --gold-dark: #b8860b; --text: #ffffff; --dim: #888;
-        }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
-        body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
-            background: var(--bg); color: var(--text);
-            font-family: -apple-system, system-ui, sans-serif;
-            overflow: hidden;
-        }
-
-        header {
-            position: fixed; top: 0; left: 0; right: 0; height: 70px;
-            padding: env(safe-area-inset-top) 20px 0;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
-            display: flex; justify-content: space-between; align-items: center;
-            border-bottom: 1px solid #1a1a1a; z-index: 100;
-        }
-        .brand { font-weight: 900; font-size: 1.2rem; color: var(--gold); letter-spacing: 1px; }
-
-        main {
-            position: absolute; top: 70px; bottom: 0; left: 0; right: 0;
-            padding: 15px; overflow-y: auto; display: flex; flex-direction: column;
-        }
-
-        .main-tabs {
-            display: flex; background: var(--inner); border-radius: 20px;
-            padding: 5px; margin-bottom: 20px; border: 1px solid #1a1a1a;
-        }
-        .m-tab {
-            flex: 1; padding: 12px; text-align: center; font-size: 13px; 
-            font-weight: 700; color: var(--dim); border-radius: 16px; transition: 0.3s;
-        }
-        .m-tab.active { background: #1a1a1a; color: var(--gold); }
-
-        .card {
-            background: var(--card); border-radius: 30px; 
-            padding: 20px 15px; border: 1px solid #222;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.7);
-        }
-
-        .sub-nav {
-            display: flex; background: var(--inner); border-radius: 15px;
-            margin-bottom: 20px; padding: 4px; border: 1px solid #111;
-        }
-        .s-tab {
-            flex: 1; padding: 10px; font-size: 11px; font-weight: 700; 
-            color: var(--dim); border-radius: 12px; text-align: center;
-        }
-        .s-tab.active { background: #222; color: #fff; }
-
-        .input-group {
-            background: var(--inner); border-radius: 22px; padding: 18px;
-            border: 1px solid #111; margin-bottom: 8px;
-        }
-        .meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-bottom: 10px; }
-        .row { display: flex; align-items: center; justify-content: space-between; }
-        input { background: transparent; border: none; color: #fff; font-size: 26px; font-weight: bold; width: 60%; }
+        :root { --bg: #050505; --card: #0f0f0f; --accent: #00ff88; --warn: #ffcc00; --err: #ff4444; --text: #ececec; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .cockpit { width: 100%; max-width: 460px; background: var(--card); border: 1px solid #222; border-radius: 14px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.7); }
         
-        .token-pill {
-            background: #1a1a1a; padding: 8px 12px; border-radius: 14px;
-            display: flex; align-items: center; gap: 8px; border: 1px solid #333;
-        }
-        select { background: transparent; border: none; color: #fff; font-weight: bold; font-size: 13px; }
-
-        .divider { display: flex; justify-content: center; margin: -22px 0; position: relative; z-index: 10; }
-        .circle-btn {
-            background: #111; border: 4px solid var(--bg); width: 42px; height: 42px;
-            border-radius: 12px; color: var(--gold); display: flex; align-items: center; justify-content: center;
-            font-size: 18px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-        }
-
-        .estimate-info {
-            margin-top: 15px; padding: 12px 15px; background: rgba(255,255,255,0.03);
-            border-radius: 15px; font-size: 11px; color: var(--dim);
-            display: flex; justify-content: space-between; border: 1px solid #1a1a1a;
-        }
-
-        .slider-box { padding: 20px 10px; }
-        input[type=range] { width: 100%; accent-color: var(--gold); margin: 15px 0; }
-        .percent-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-        .p-btn { background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 8px; border-radius: 10px; font-size: 11px; }
-
-        /* Tombol Gahar (White with Black Outline) */
-        .btn-prime {
-            width: 100%; padding: 18px; border-radius: 22px; border: none;
-            background: linear-gradient(135deg, var(--gold), var(--gold-dark));
-            color: #ffffff;
-            font-weight: 900; font-size: 18px; margin-top: 20px;
-            text-transform: uppercase; letter-spacing: 1.5px;
-            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-        }
-        .btn-prime:active { transform: scale(0.98); filter: brightness(0.9); }
+        /* Fleet Radar */
+        #fleet-overview { background: #080808; border: 1px solid #1a1a1a; padding: 16px; border-radius: 10px; margin-bottom: 24px; font-family: 'Courier New', monospace; }
+        .fleet-status-bar { display: flex; justify-content: space-between; font-size: 0.7rem; margin-bottom: 12px; border-bottom: 1px solid #222; padding-bottom: 8px; }
+        .fleet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .fleet-card { border-left: 2px solid #333; padding-left: 10px; }
+        .fleet-card.active { border-left-color: var(--accent); }
+        .fleet-card.focus { border-left-color: var(--warn); background: rgba(255,204,0,0.03); }
+        .fleet-card span { display: block; font-size: 0.6rem; color: #666; text-transform: uppercase; }
+        .fleet-card b { font-size: 1rem; color: #fff; }
+        
+        /* Execution UI */
+        .field { margin-bottom: 18px; }
+        label { display: block; font-size: 0.7rem; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+        select, input { width: 100%; background: #151515; border: 1px solid #333; color: #fff; padding: 14px; border-radius: 8px; box-sizing: border-box; font-size: 1rem; outline: none; }
+        select:focus, input:focus { border-color: var(--accent); }
+        .btn-exec { width: 100%; padding: 16px; background: var(--accent); color: #000; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; margin-top: 10px; transition: 0.3s; text-transform: uppercase; }
+        .btn-exec:disabled { background: #222; color: #555; cursor: not-allowed; }
+        
+        /* Comm Channels */
+        .status-pill { margin-top: 15px; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.8rem; text-align: center; border: 1px solid transparent; }
+        .status-ok { background: rgba(0,255,136,0.08); color: var(--accent); border-color: rgba(0,255,136,0.2); }
+        .status-bad { background: rgba(255,68,68,0.08); color: var(--err); border-color: rgba(255,68,68,0.2); font-weight: bold; }
+        
+        /* Forensic Logbook */
+        #log-history { margin-top: 24px; max-height: 220px; overflow-y: auto; border-top: 1px solid #222; padding-top: 15px; font-family: monospace; font-size: 0.75rem; }
+        .log-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #111; align-items: center; }
+        .log-item.failed { color: #777; }
+        .tag-fail { color: var(--err); font-weight: bold; margin-right: 6px; font-size: 0.65rem; border: 1px solid var(--err); padding: 1px 4px; border-radius: 3px; }
+        .tag-success { color: var(--accent); font-size: 0.65rem; border: 1px solid var(--accent); padding: 1px 4px; border-radius: 3px; margin-right: 6px; }
+        .log-hash { text-decoration: none; color: #444; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="brand">BOZZ<span style="color:#fff">DEX</span></div>
-        <div id="wallet-btn" onclick="KernelDispatcher.boot()" style="background:#1a1a1a; padding:8px 12px; border-radius:12px; font-size:11px; font-weight:bold; border:1px solid #333; color: var(--gold); min-width: 120px; text-align: center;">CONNECT WALLET</div>
-    </header>
+<div class="cockpit">
+    <div id="fleet-overview"></div>
 
-    <main>
-        <div class="main-tabs">
-            <div class="m-tab active" id="m-swap" onclick="UIBridge.switchMain('swap')">Swap</div>
-            <div class="m-tab" id="m-liq" onclick="UIBridge.switchMain('liq')">Liquidity</div>
-        </div>
+    <div class="field">
+        <label>Input Asset</label>
+        <select id="sel-in" onchange="SovereignEngine.render()">
+            <option value="OPN">OPN (Native)</option>
+            <option value="tUSDT">tUSDT</option>
+            <option value="OPNT">OPNT</option>
+        </select>
+        <input type="number" id="amt-in" placeholder="0.00" step="0.01">
+        <div style="font-size: 0.7rem; color: #555; margin-top: 6px;">AVAILABLE: <span id="bal-in">0.0000</span></div>
+    </div>
 
-        <div class="card">
-            <div id="liq-nav" class="sub-nav" style="display: none;">
-                <div class="s-tab active" id="s-add" onclick="UIBridge.switchSub('add')">Add Liquidity</div>
-                <div class="s-tab" id="s-rem" onclick="UIBridge.switchSub('rem')">Remove Liquidity</div>
-            </div>
+    <div class="field">
+        <label>Output Asset</label>
+        <select id="sel-out" onchange="SovereignEngine.render()">
+            <option value="PRET">PRET</option>
+            <option value="WOPN">WOPN</option>
+            <option value="OPN">OPN (Native)</option>
+        </select>
+        <div style="font-size: 0.7rem; color: #555; margin-top: 6px;">BALANCE: <span id="bal-out">0.0000</span></div>
+    </div>
 
-            <div id="form-content">
-                <div class="input-group">
-                    <div class="meta">
-                        <span id="lbl-in">Pay</span>
-                        <span>Balance: <b id="bal-in" style="color:#fff">0.00</b> <small style="color:var(--gold); margin-left:5px" onclick="UIBridge.setMax()">MAX</small></span>
+    <button id="exec-btn" class="btn-exec" onclick="SovereignEngine.execute()">Initiate Mission</button>
+    <div id="kernelState" class="status-pill status-ok">SYSTEM READY</div>
+
+    <div id="log-history"></div>
+</div>
+
+<script>
+/**
+ * SOVEREIGN ENGINE v90.8 - THE FINAL SENTINEL
+ * Protokol: Deep Sleep, Adaptive Backoff, Epoch Guard, & Forensic Mapping
+ */
+
+const SovereignEngine = (() => {
+    const _CONFIG = Object.freeze({
+        ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
+        WOPN: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84",
+        ROUTER_ABI: [
+            "function getAmountsOut(uint amtIn, address[] path) view returns (uint[] amts)",
+            "function swapExactTokensForTokensSupportingFeeOnTransferTokens(uint amtIn, uint amtOutMin, address[] path, address to, uint deadline)",
+            "function swapExactETHForTokensSupportingFeeOnTransferTokens(uint amtOutMin, address[] path, address to, uint deadline) payable",
+            "function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amtIn, uint amtOutMin, address[] path, address to, uint deadline)"
+        ],
+        ASSETS: {
+            OPN:   { addr: "NATIVE", dec: 18, slip: 2 },
+            WOPN:  { addr: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84", dec: 18, slip: 1 },
+            OPNT:  { addr: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d", dec: 18, slip: 3 },
+            tUSDT: { addr: "0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b", dec: 18, slip: 2 },
+            PRET:  { addr: "0xEcbf04b23f5b15492794dE22Da5A9819b60B88FD", dec: 18, slip: 12, hasFee: true }
+        }
+    });
+
+    let _hydrateEpoch = 0;
+    let _notifyToken = 0;
+    let _consecutiveFails = 0;
+    let _pollTimeout = null;
+    let _savedLogs = [];
+    
+    try { _savedLogs = JSON.parse(localStorage.getItem('bozzdex_v90_logs')) || []; } catch(e) { _savedLogs = []; }
+
+    const _STATE = { 
+        address: null, 
+        balances: {}, 
+        status: "IDLE", 
+        error: "", 
+        message: "", 
+        logs: _savedLogs 
+    };
+
+    let _provider = window.ethereum ? new ethers.BrowserProvider(window.ethereum) : null;
+
+    const _core = {
+        async fetchRawBalance(sym, provider, address) {
+            const asset = _CONFIG.ASSETS[sym];
+            if (asset.addr === "NATIVE") return await provider.getBalance(address);
+            return await (new ethers.Contract(asset.addr, ["function balanceOf(address) view returns (uint256)"], provider)).balanceOf(address);
+        },
+
+        async getValidatedPath(sIn, sOut, amtWei) {
+            const aIn = _CONFIG.ASSETS[sIn].addr === "NATIVE" ? _CONFIG.WOPN : _CONFIG.ASSETS[sIn].addr;
+            const aOut = _CONFIG.ASSETS[sOut].addr === "NATIVE" ? _CONFIG.WOPN : _CONFIG.ASSETS[sOut].addr;
+            const direct = [aIn, aOut];
+            const bridge = [aIn, _CONFIG.WOPN, aOut];
+            try {
+                const r = new ethers.Contract(_CONFIG.ROUTER, _CONFIG.ROUTER_ABI, _provider);
+                const q = await r.getAmountsOut(amtWei, direct);
+                if (q[1] > 0n) return direct;
+            } catch (e) {}
+            return bridge;
+        },
+
+        saveLog(entry) {
+            try {
+                const atomicEntry = { ts: Date.now(), time: new Date().toLocaleTimeString(), ...entry };
+                _STATE.logs.unshift(atomicEntry);
+                if (_STATE.logs.length > 20) _STATE.logs.pop();
+                localStorage.setItem('bozzdex_v90_logs', JSON.stringify(_STATE.logs));
+            } catch (e) { console.warn("Black Box Full"); }
+        },
+
+        notify(msg, type = "INFO") {
+            const token = ++_notifyToken;
+            if (type === "ERR") {
+                _STATE.error = msg;
+                _STATE.message = "";
+            } else {
+                _STATE.message = msg;
+                _STATE.error = "";
+                setTimeout(() => {
+                    if (_notifyToken === token) {
+                        _STATE.message = "";
+                        SovereignEngine.render();
+                    }
+                }, 7000);
+            }
+            SovereignEngine.render();
+        },
+
+        getFleetIntelligence() {
+            if (_STATE.logs.length === 0) return { health: "STANDBY", lastSuccess: "NONE", lastHeartbeat: "NONE", count: 0 };
+            const sorted = [..._STATE.logs].sort((a, b) => b.ts - a.ts);
+            const window = sorted.slice(0, 10);
+            const fails = window.filter(l => l.status === "FAILED").length;
+            let h = "OPERATIONAL";
+            if (fails >= 4) h = "CRITICAL"; else if (fails >= 2) h = "WARNING";
+            return { health: h, lastSuccess: sorted.find(l => l.status === "SUCCESS")?.time || "NEVER", lastHeartbeat: sorted[0].time, count: _STATE.logs.length };
+        }
+    };
+
+    return {
+        async hydrate() {
+            if (_pollTimeout) clearTimeout(_pollTimeout);
+            
+            // DEEP SLEEP PROTOCOL
+            if (document.hidden || !_STATE.address || !_provider) {
+                console.log("SENTINEL_HIBERNATION: Active");
+                return;
+            }
+
+            const epoch = ++_hydrateEpoch;
+            const res = {};
+            try {
+                for (const s of Object.keys(_CONFIG.ASSETS)) {
+                    if (epoch !== _hydrateEpoch) return;
+                    const bal = await _core.fetchRawBalance(s, _provider, _STATE.address);
+                    res[s] = ethers.formatUnits(bal, _CONFIG.ASSETS[s].dec);
+                }
+                if (epoch !== _hydrateEpoch) return;
+                _STATE.balances = res;
+                _consecutiveFails = 0;
+                this.render();
+            } catch (e) {
+                _consecutiveFails++;
+                if (_consecutiveFails >= 3) _core.notify("NETWORK_UNSTABLE", "ERR");
+            } finally {
+                if (!document.hidden) this.scheduleHydrate();
+            }
+        },
+
+        scheduleHydrate() {
+            if (document.hidden) return;
+            // ADAPTIVE BACKOFF: 5s -> 10s -> 20s -> 60s
+            let delay = 5000;
+            if (_consecutiveFails === 1) delay = 10000;
+            else if (_consecutiveFails === 2) delay = 20000;
+            else if (_consecutiveFails >= 3) delay = 60000;
+            _pollTimeout = setTimeout(() => this.hydrate(), delay);
+        },
+
+        render() {
+            const sIn = document.getElementById('sel-in').value;
+            const sOut = document.getElementById('sel-out').value;
+            document.getElementById('bal-in').innerText = parseFloat(_STATE.balances[sIn] || 0).toFixed(4);
+            document.getElementById('bal-out').innerText = parseFloat(_STATE.balances[sOut] || 0).toFixed(4);
+            
+            const k = document.getElementById('kernelState');
+            if (_STATE.error) {
+                k.innerText = `[!] ${_STATE.error}`;
+                k.className = "status-pill status-bad";
+            } else if (_STATE.message) {
+                k.innerText = `[*] ${_STATE.message}`;
+                k.className = "status-pill status-ok";
+            } else {
+                k.innerText = `SYSTEM ${_STATE.status}`;
+                k.className = "status-pill status-ok";
+            }
+
+            document.getElementById('exec-btn').disabled = (_STATE.status !== "IDLE" || sIn === sOut);
+
+            const intel = _core.getFleetIntelligence();
+            const fleet = document.getElementById('fleet-overview');
+            if (fleet) {
+                const assets = ['OPN', 'PRET', 'tUSDT'];
+                fleet.innerHTML = `
+                    <div class="fleet-status-bar">
+                        <span style="color:${intel.health==='CRITICAL'?'#ff4444':intel.health==='WARNING'?'#ffcc00':'#00ff88'}">● ${intel.health}</span>
+                        <span style="color:#555">${intel.lastHeartbeat} | MIS: ${intel.count}</span>
                     </div>
-                    <div class="row">
-                        <input type="number" id="amt-in" placeholder="0.0" oninput="UIBridge.calc()">
-                        <div class="token-pill">
-                            <select id="sel-in" onchange="UIBridge.calc()">
-                                <option value="WOPN">WOPN</option>
-                                <option value="OPNT">OPNT</option>
-                                <option value="tUSDT">tUSDT</option>
-                            </select>
-                        </div>
+                    <div class="fleet-grid">
+                        ${assets.map(s => `
+                            <div class="fleet-card ${s==='PRET'?'focus':'active'}">
+                                <span>${s} POS</span>
+                                <b>${parseFloat(_STATE.balances[s]||0).toFixed(3)}</b>
+                            </div>`).join('')}
                     </div>
-                </div>
+                `;
+            }
 
-                <div class="divider"><div class="circle-btn" id="mid-icon">⇅</div></div>
+            document.getElementById('log-history').innerHTML = _STATE.logs.map(log => 
+                log.status === "SUCCESS" ? 
+                `<div class="log-item"><span class="tag-success">SUCCESS</span><span>${log.pair} | +${log.net}</span><a class="log-hash" href="https://testnet.iopn.tech/tx/${log.hash}" target="_blank">🔗</a></div>` :
+                `<div class="log-item failed"><span class="tag-fail">${log.phase}</span><span>${log.reason}</span></div>`
+            ).join('');
+        },
 
-                <div class="input-group" style="margin-top: 10px;" id="box-out">
-                    <div class="meta">
-                        <span id="lbl-out">Receive (Estimate)</span>
-                        <span>Balance: <b id="bal-out" style="color:#fff">0.00</b></span>
-                    </div>
-                    <div class="row">
-                        <input type="number" id="amt-out" placeholder="0.0" readonly>
-                        <div class="token-pill">
-                            <select id="sel-out" onchange="UIBridge.calc()">
-                                <option value="OPNT">OPNT</option>
-                                <option value="WOPN">WOPN</option>
-                                <option value="TETE">TETE</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+        async execute() {
+            if (_STATE.status !== "IDLE") return;
+            _STATE.error = ""; _STATE.message = "";
+            const sIn = document.getElementById('sel-in').value;
+            const sOut = document.getElementById('sel-out').value;
+            const val = document.getElementById('amt-in').value;
+            let currentPhase = "PRE-FLIGHT";
 
-                <div id="swap-info-box" class="estimate-info" style="display: none;">
-                    <span>Minimum Received:</span>
-                    <b id="min-received" style="color: #fff;">0.00 OPNT</b>
-                </div>
+            try {
+                const signer = await _provider.getSigner();
+                const router = new ethers.Contract(_CONFIG.ROUTER, _CONFIG.ROUTER_ABI, signer);
+                const amtWei = ethers.parseUnits(val, _CONFIG.ASSETS[sIn].dec);
 
-                <div id="remove-ui" class="slider-box" style="display: none;">
-                    <div class="meta"><span>Amount to Remove: <b id="range-val" style="color:var(--gold)">25%</b></span></div>
-                    <input type="range" id="rem-range" min="0" max="100" value="25" oninput="UIBridge.updateRange(this.value)">
-                    <div class="percent-grid">
-                        <button class="p-btn" onclick="UIBridge.updateRange(25)">25%</button>
-                        <button class="p-btn" onclick="UIBridge.updateRange(50)">50%</button>
-                        <button class="p-btn" onclick="UIBridge.updateRange(75)">75%</button>
-                        <button class="p-btn" onclick="UIBridge.updateRange(100)">100%</button>
-                    </div>
-                </div>
-            </div>
+                currentPhase = "ROUTING"; _STATE.status = currentPhase; this.render();
+                const path = await _core.getValidatedPath(sIn, sOut, amtWei);
 
-            <button class="btn-prime" id="exec-btn" onclick="UIBridge.handleExecute()">Enter Amount</button>
-        </div>
-    </main>
+                currentPhase = "QUOTING"; _STATE.status = currentPhase; this.render();
+                const quotes = await router.getAmountsOut(amtWei, path);
+                let qOut = quotes[quotes.length - 1];
+                if (_CONFIG.ASSETS[sIn].hasFee || _CONFIG.ASSETS[sOut].hasFee) qOut = (qOut * 92n) / 100n;
+                const minOut = (qOut * BigInt(100 - (_CONFIG.ASSETS[sOut].slip || 5))) / 100n;
 
-    <script>
-        /**
-         * SOVEREIGN ENGINE v71.5 - BOZZDEX
-         */
-        const SovereignEngine = (() => {
-            const _CONFIG = Object.freeze({
-                CHAIN_ID: 984,
-                RPC: "https://testnet-rpc2.iopn.tech",
-                ROUTER_BOZZ: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
-                ASSETS: {
-                    WOPN: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84",
-                    OPNT: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d",
-                    tUSDT: "0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b",
-                    tBNB: "0x92cF36713a5622351c9489D5556B90B321873607",
-                    TETE: "0x771699b159F5DEC9608736DC9C6c901Ddb7Afe3E"
-                },
-                HEARTBEAT_INTERVAL: 3000
+                const balBefore = await _core.fetchRawBalance(sOut, _provider, _STATE.address);
+
+                if (_CONFIG.ASSETS[sIn].addr !== "NATIVE") {
+                    currentPhase = "APPROVING"; _STATE.status = currentPhase; this.render();
+                    await (await (new ethers.Contract(_CONFIG.ASSETS[sIn].addr, ["function approve(address,uint256) returns (bool)"], signer)).approve(_CONFIG.ROUTER, amtWei)).wait();
+                }
+
+                currentPhase = "SWAPPING"; _STATE.status = currentPhase; this.render();
+                const deadline = Math.floor(Date.now() / 1000) + 1200;
+                let tx;
+                if (sIn === "OPN") tx = await router.swapExactETHForTokensSupportingFeeOnTransferTokens(minOut, path, _STATE.address, deadline, { value: amtWei });
+                else if (sOut === "OPN") tx = await router.swapExactTokensForETHSupportingFeeOnTransferTokens(amtWei, minOut, path, _STATE.address, deadline);
+                else tx = await router.swapExactTokensForTokensSupportingFeeOnTransferTokens(amtWei, minOut, path, _STATE.address, deadline);
+
+                _STATE.status = "MINING"; this.render();
+                const receipt = await tx.wait();
+
+                const balAfter = await _core.fetchRawBalance(sOut, _provider, _STATE.address);
+                let diff = balAfter - balBefore;
+                if (sOut === "OPN") diff += (receipt.gasUsed * (receipt.effectiveGasPrice || receipt.gasPrice));
+
+                _core.saveLog({ pair: `${sIn}→${sOut}`, net: ethers.formatUnits(diff, _CONFIG.ASSETS[sOut].dec).slice(0, 8), hash: receipt.hash, status: "SUCCESS" });
+                _STATE.status = "SUCCESS"; _core.notify("MISSION ACCOMPLISHED", "OK");
+
+            } catch (e) {
+                const isReject = e.code === "ACTION_REJECTED" || e.code === 4001;
+                const isNetwork = e.code === "NETWORK_ERROR" || e.message?.includes("network") || e.cause?.code === "ECONNREFUSED";
+                const actor = isReject ? "USER_ABORT" : (isNetwork ? "NETWORK_FAIL" : "CONTRACT_REVERT");
+                const reason = e.shortMessage || e.reason || e.message || "UNKNOWN";
+
+                _core.saveLog({ pair: `${sIn}→${sOut}`, phase: currentPhase, reason: `${actor}: ${reason.slice(0, 20)}`, status: "FAILED" });
+                _core.notify(`${actor} @ ${currentPhase}`, "ERR");
+                _STATE.status = "ERROR";
+            } finally {
+                setTimeout(() => { _STATE.status = "IDLE"; _STATE.error = ""; this.hydrate(); }, 5000);
+            }
+        },
+
+        boot() {
+            if (!_provider) return;
+            window.ethereum.on('accountsChanged', () => window.location.reload());
+            window.ethereum.on('chainChanged', () => window.location.reload());
+            
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    console.log("SENTINEL_WAKE: Immediate Recovery");
+                    this.hydrate();
+                }
             });
 
-            const _INTERNAL = {
-                state: {
-                    vault: { address: null, balances: { WOPN: "0", OPNT: "0", tUSDT: "0", OPN: "0" } },
-                    kernel: { status: "IDLE", txQueue: [], slippage: 0.5, currentRate: 0.24 }
-                },
-                staticProvider: new ethers.JsonRpcProvider(_CONFIG.RPC),
-                inflightHydration: false
-            };
+            window.ethereum.request({ method: 'eth_requestAccounts' }).then(accs => {
+                _STATE.address = accs[0];
+                this.hydrate();
+            });
+        }
+    };
+})();
 
-            const _core = {
-                mutate(updates) {
-                    updates.forEach(([path, value]) => {
-                        const keys = path.split('.');
-                        let target = _INTERNAL.state;
-                        for (let i = 0; i < keys.length - 1; i++) target = target[keys[i]];
-                        target[keys[keys.length - 1]] = value;
-                    });
-                    this.notifyUI();
-                },
-                notifyUI() {
-                    const st = _INTERNAL.state;
-                    // Update Header Wallet
-                    if(st.vault.address) {
-                        document.getElementById('wallet-btn').innerText = st.vault.address.slice(0,6) + "..." + st.vault.address.slice(-4);
-                    }
-                    // Sync Balances
-                    const sIn = document.getElementById('sel-in').value;
-                    const sOut = document.getElementById('sel-out').value;
-                    document.getElementById('bal-in').innerText = parseFloat(st.vault.balances[sIn] || 0).toFixed(4);
-                    document.getElementById('bal-out').innerText = parseFloat(st.vault.balances[sOut] || 0).toFixed(4);
-                    
-                    // Status Button
-                    const btn = document.getElementById('exec-btn');
-                    if(st.kernel.status !== "IDLE") btn.innerText = st.kernel.status + "...";
-                }
-            };
-
-            return {
-                async execute(payload) {
-                    if (_INTERNAL.state.kernel.status !== "IDLE") return;
-                    _core.mutate([['kernel.status', 'APPROVING']]);
-                    try {
-                        const provider = new ethers.BrowserProvider(window.ethereum);
-                        const signer = await provider.getSigner();
-                        const tokenContract = new ethers.Contract(_CONFIG.ASSETS[payload.tokenIn], 
-                            ["function approve(address,uint256) returns (bool)"], signer);
-                        const tx = await tokenContract.approve(_CONFIG.ROUTER_BOZZ, ethers.parseUnits(payload.amount, 18));
-                        _core.mutate([['kernel.status', 'SIGNING']]);
-                        await tx.wait();
-                        this.finalize(tx.hash, payload.tokenIn, "SUCCESS");
-                    } catch (err) {
-                        this.finalize(null, "TX", "FAILED", err.message);
-                    }
-                },
-
-                async hydrate() {
-                    const addr = _INTERNAL.state.vault.address;
-                    if (!addr || _INTERNAL.inflightHydration) return;
-                    _INTERNAL.inflightHydration = true;
-                    try {
-                        const results = {};
-                        const native = await _INTERNAL.staticProvider.getBalance(addr);
-                        results['OPN'] = ethers.formatEther(native);
-                        const calls = Object.entries(_CONFIG.ASSETS).map(async ([symbol, ca]) => {
-                            const contract = new ethers.Contract(ca, ["function balanceOf(address) view returns (uint256)"], _INTERNAL.staticProvider);
-                            const bal = await contract.balanceOf(addr);
-                            results[symbol] = ethers.formatEther(bal);
-                        });
-                        await Promise.all(calls);
-                        _core.mutate([['vault.balances', results]]);
-                    } finally { _INTERNAL.inflightHydration = false; }
-                },
-
-                finalize(hash, type, status) {
-                    _core.mutate([['kernel.status', 'IDLE']]);
-                    this.hydrate();
-                    if(status === "SUCCESS") alert("Transaction Success!");
-                },
-
-                boot: async function() {
-                    if (!window.ethereum) return alert("Please use a Web3 Browser");
-                    const accs = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    _core.mutate([['vault.address', accs[0]]]);
-                    
-                    window.ethereum.on('accountsChanged', (a) => {
-                        _core.mutate([['vault.address', a[0]]]);
-                        this.hydrate();
-                    });
-
-                    setInterval(() => this.hydrate(), _CONFIG.HEARTBEAT_INTERVAL);
-                    this.hydrate();
-                    console.log("%c BOZZDEX ONLINE ", "background:#d4af37;color:#000;font-weight:bold;");
-                }
-            };
-        })();
-
-        /**
-         * UI BRIDGE & LOGIC
-         */
-        const UIBridge = {
-            switchMain(mode) {
-                const isLiq = mode === 'liq';
-                document.getElementById('m-swap').classList.toggle('active', !isLiq);
-                document.getElementById('m-liq').classList.toggle('active', isLiq);
-                document.getElementById('liq-nav').style.display = isLiq ? 'flex' : 'none';
-                this.switchSub(isLiq ? 'add' : 'swap');
-            },
-            switchSub(sub) {
-                const isRem = sub === 'rem';
-                const isSwap = sub === 'swap';
-                if(!isSwap) {
-                    document.getElementById('s-add').className = sub === 'add' ? 's-tab active' : 's-tab';
-                    document.getElementById('s-rem').className = isRem ? 's-tab active' : 's-tab';
-                }
-                document.getElementById('box-out').style.display = isRem ? 'none' : 'block';
-                document.getElementById('remove-ui').style.display = isRem ? 'block' : 'none';
-                document.getElementById('swap-info-box').style.display = 'none';
-                document.getElementById('mid-icon').innerText = isRem ? '↓' : (sub === 'add' ? '+' : '⇅');
-                
-                const btn = document.getElementById('exec-btn');
-                if(isSwap) btn.innerText = "Swap Asset";
-                else btn.innerText = isRem ? "Remove Liquidity" : "Add Liquidity";
-            },
-            calc() {
-                const val = document.getElementById('amt-in').value;
-                const isSwap = document.getElementById('m-swap').classList.contains('active');
-                if(val > 0 && isSwap) {
-                    const est = val * 1.025; // Dummy Rate 
-                    document.getElementById('amt-out').value = est.toFixed(4);
-                    document.getElementById('swap-info-box').style.display = 'flex';
-                    document.getElementById('min-received').innerText = (est * 0.995).toFixed(4) + " " + document.getElementById('sel-out').value;
-                } else {
-                    document.getElementById('swap-info-box').style.display = 'none';
-                    document.getElementById('amt-out').value = '';
-                }
-            },
-            setMax() {
-                document.getElementById('amt-in').value = document.getElementById('bal-in').innerText;
-                this.calc();
-            },
-            updateRange(v) {
-                document.getElementById('rem-range').value = v;
-                document.getElementById('range-val').innerText = v + '%';
-            },
-            handleExecute() {
-                const amt = document.getElementById('amt-in').value;
-                if(!amt || amt <= 0) return alert("Enter Amount!");
-                SovereignEngine.execute({
-                    amount: amt,
-                    tokenIn: document.getElementById('sel-in').value,
-                    tokenOut: document.getElementById('sel-out').value
-                });
-            }
-        };
-
-        window.KernelDispatcher = SovereignEngine;
-    </script>
+SovereignEngine.boot();
+</script>
 </body>
 </html>
