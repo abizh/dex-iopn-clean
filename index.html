@@ -3,42 +3,224 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SOVEREIGN SENTINEL v91.2</title>
+  <title>SOVEREIGN SENTINEL v91.3</title>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+
   <style>
-    :root { --bg: #050505; --card: #0f0f0f; --accent: #00ff88; --err: #ff4444; --border: #222; }
-    body { margin: 0; padding: 20px; background: var(--bg); color: #ececec; font-family: "Segoe UI", sans-serif; display: flex; justify-content: center; }
-    .cockpit { width: 100%; max-width: 480px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-    .title { text-align: center; font-weight: 900; color: var(--accent); text-transform: uppercase; margin-bottom: 20px; font-size: 1.2rem; }
-    .fleet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
-    .fleet-card { background: #111; border: 1px solid #222; border-radius: 8px; padding: 10px; text-align: center; }
-    .fleet-card span { display: block; font-size: 0.65rem; color: #888; }
-    .fleet-card b { font-size: 1rem; color: #fff; }
-    .pret-focus { border-top: 2px solid #ffcc00; }
-    .field { margin-bottom: 15px; }
-    label { font-size: 0.7rem; color: #888; text-transform: uppercase; margin-bottom: 5px; display: block; }
-    select, input { width: 100%; background: #181818; color: #fff; border: 1px solid #333; padding: 12px; border-radius: 8px; outline: none; }
-    input:focus { border-color: var(--accent); }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .btn-exec { width: 100%; padding: 15px; background: var(--accent); color: #000; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; margin-top: 10px; }
-    .btn-exec:disabled { background: #222; color: #555; cursor: not-allowed; }
-    .btn-mini { background: #222; color: #ccc; border: 1px solid #333; padding: 5px 10px; border-radius: 4px; font-size: 0.7rem; cursor: pointer; margin-top: 5px; }
-    .status-pill { margin-top: 15px; padding: 10px; border-radius: 8px; text-align: center; font-family: monospace; font-size: 0.8rem; }
-    .status-ok { background: rgba(0,255,136,0.1); color: var(--accent); }
-    .status-bad { background: rgba(255,68,68,0.1); color: var(--err); }
-    #log-history { margin-top: 20px; border-top: 1px solid #222; padding-top: 10px; font-family: monospace; font-size: 0.75rem; max-height: 150px; overflow-y: auto; }
-    .log-item { padding: 5px 0; border-bottom: 1px solid #111; }
-    .ok-tag { color: var(--accent); }
-    .err-tag { color: var(--err); }
-    .log-hash { color: #555; text-decoration: none; margin-left: 10px; }
+    :root {
+      --bg: #050505;
+      --card: #0f0f0f;
+      --accent: #00ff88;
+      --err: #ff4444;
+      --border: #222;
+      --text: #ececec;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", sans-serif;
+      display: flex;
+      justify-content: center;
+    }
+
+    .cockpit {
+      width: 100%;
+      max-width: 500px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .title {
+      text-align: center;
+      font-weight: 900;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      font-size: 1.2rem;
+      letter-spacing: 1px;
+    }
+
+    .fleet-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .fleet-card {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .fleet-card span {
+      display: block;
+      font-size: 0.65rem;
+      color: #888;
+      margin-bottom: 5px;
+    }
+
+    .fleet-card b {
+      font-size: 1rem;
+      color: #fff;
+    }
+
+    .pret-focus {
+      border-top: 2px solid #ffcc00;
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.72rem;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    select,
+    input {
+      width: 100%;
+      background: #181818;
+      color: #fff;
+      border: 1px solid #333;
+      padding: 12px;
+      border-radius: 10px;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--accent);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .btn-exec {
+      width: 100%;
+      padding: 15px;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .btn-exec:disabled {
+      background: #222;
+      color: #555;
+      cursor: not-allowed;
+    }
+
+    .btn-mini {
+      background: #222;
+      color: #ccc;
+      border: 1px solid #333;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+
+    .status-pill {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 10px;
+      text-align: center;
+      font-family: monospace;
+      font-size: 0.8rem;
+      word-break: break-word;
+    }
+
+    .status-ok {
+      background: rgba(0,255,136,0.1);
+      color: var(--accent);
+    }
+
+    .status-bad {
+      background: rgba(255,68,68,0.1);
+      color: var(--err);
+    }
+
+    #log-history {
+      margin-top: 20px;
+      border-top: 1px solid #222;
+      padding-top: 10px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .log-item {
+      padding: 8px 0;
+      border-bottom: 1px solid #111;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .ok-tag {
+      color: var(--accent);
+      font-weight: bold;
+    }
+
+    .err-tag {
+      color: var(--err);
+      font-weight: bold;
+    }
+
+    .log-hash {
+      color: #888;
+      text-decoration: none;
+      display: inline-block;
+      margin-top: 4px;
+    }
+
+    .meta-balance {
+      margin-top: 4px;
+      color: #666;
+      font-size: 0.72rem;
+    }
   </style>
 </head>
 <body>
   <div class="cockpit">
-    <div class="title">Sovereign Sentinel v91.2</div>
+
+    <div class="title">Sovereign Sentinel v91.3</div>
+
     <div id="fleet-overview"></div>
+
     <div class="field">
       <label>Input Asset</label>
+
       <div class="row">
         <select id="sel-in" onchange="UIHelper.handleInput()">
           <option value="OPN">OPN (Native)</option>
@@ -47,6 +229,7 @@
           <option value="tUSDT">tUSDT</option>
           <option value="PRET">PRET</option>
         </select>
+
         <select id="sel-out" onchange="UIHelper.handleInput()">
           <option value="PRET">PRET</option>
           <option value="WOPN">WOPN</option>
@@ -55,22 +238,60 @@
           <option value="tUSDT">tUSDT</option>
         </select>
       </div>
-      <div style="font-size:0.7rem; color:#666; margin-top:4px;">AVAILABLE: <span id="bal-in">0.0000</span></div>
+
+      <div class="meta-balance">
+        AVAILABLE: <span id="bal-in">0.0000</span>
+      </div>
     </div>
+
     <div class="field">
       <label>Amount In</label>
-      <input id="amt-in" type="number" step="any" placeholder="0.0" oninput="UIHelper.handleInput()" />
-      <button class="btn-mini" onclick="UIHelper.setMax()">MAX SALDO</button>
+
+      <input
+        id="amt-in"
+        type="number"
+        step="any"
+        placeholder="0.0"
+        oninput="UIHelper.handleInput()"
+      />
+
+      <button class="btn-mini" onclick="UIHelper.setMax()">
+        MAX SALDO
+      </button>
     </div>
+
     <div class="field">
       <label>Estimated Out (Min)</label>
-      <input id="amt-out" type="text" readonly placeholder="0.0" />
-      <div style="font-size:0.7rem; color:#666; margin-top:4px;">BALANCE: <span id="bal-out">0.0000</span></div>
+
+      <input
+        id="amt-out"
+        type="text"
+        readonly
+        placeholder="0.0"
+      />
+
+      <div class="meta-balance">
+        BALANCE: <span id="bal-out">0.0000</span>
+      </div>
     </div>
-    <button id="exec-btn" class="btn-exec" onclick="UIHelper.execute()" disabled>EXECUTE MISSION</button>
-    <div id="kernelState" class="status-pill status-ok">SYSTEM IDLE</div>
+
+    <button
+      id="exec-btn"
+      class="btn-exec"
+      onclick="UIHelper.execute()"
+      disabled
+    >
+      EXECUTE MISSION
+    </button>
+
+    <div id="kernelState" class="status-pill status-ok">
+      SYSTEM IDLE
+    </div>
+
     <div id="log-history"></div>
+
   </div>
+
   <script src="app.js"></script>
 </body>
 </html>
