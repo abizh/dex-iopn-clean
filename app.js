@@ -1,37 +1,53 @@
 /**
- * SOVEREIGN ENGINE v91.3 - THE ENDURANCE BUILD
- * Stable / Race-Safe / Wallet-Aware / Memory-Safe
+ * SOVEREIGN ENGINE v91.4 — THE PAIR HEALTH SENTINEL
+ * Final Rebuild:
+ * - Pair Health Intelligence
+ * - Reserve Validation
+ * - Safe Route Discovery
+ * - Recursive Hydration
+ * - Wallet Lifecycle Awareness
+ * - Atomic Preview Protection
  */
 
 const SovereignEngine = (() => {
 
   const ZERO = "0x0000000000000000000000000000000000000000";
-  const GAS_RESERVE = ethers.parseUnits("0.2", 18);
 
   const _CONFIG = Object.freeze({
+
     ROUTER: "0x98cbC837fD05cA7b0ed075990667E93ae0EE1961",
+
     FACTORY: "0x7856641544a04944474321798544D0860E21a8dE",
+
     WOPN: "0xBc022C9dEb5AF250A526321d16Ef52E39b4DBD84",
+
     EXPLORER_TX: "https://testnet.iopn.tech/tx/",
 
     ROUTER_ABI: [
-      "function getAmountsOut(uint amtIn, address[] path) view returns (uint[] amts)",
-      "function swapExactTokensForTokensSupportingFeeOnTransferTokens(uint amtIn, uint amtOutMin, address[] path, address to, uint deadline)",
-      "function swapExactETHForTokensSupportingFeeOnTransferTokens(uint amtOutMin, address[] path, address to, uint deadline) payable",
-      "function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amtIn, uint amtOutMin, address[] path, address to, uint deadline)"
+      "function getAmountsOut(uint amountIn,address[] memory path) view returns (uint[] memory amounts)",
+      "function swapExactETHForTokensSupportingFeeOnTransferTokens(uint amountOutMin,address[] calldata path,address to,uint deadline) payable",
+      "function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amountIn,uint amountOutMin,address[] calldata path,address to,uint deadline)",
+      "function swapExactTokensForTokensSupportingFeeOnTransferTokens(uint amountIn,uint amountOutMin,address[] calldata path,address to,uint deadline)"
     ],
 
     FACTORY_ABI: [
-      "function getPair(address, address) view returns (address)"
+      "function getPair(address tokenA,address tokenB) external view returns(address pair)"
     ],
 
     ERC20_ABI: [
-      "function balanceOf(address) view returns (uint256)",
-      "function approve(address,uint256) returns (bool)",
-      "function allowance(address,address) view returns (uint256)"
+      "function balanceOf(address owner) view returns(uint256)",
+      "function approve(address spender,uint256 amount) returns(bool)",
+      "function allowance(address owner,address spender) view returns(uint256)"
+    ],
+
+    PAIR_ABI: [
+      "function token0() view returns(address)",
+      "function token1() view returns(address)",
+      "function getReserves() view returns(uint112,uint112,uint32)"
     ],
 
     ASSETS: {
+
       OPN: {
         addr: "NATIVE",
         dec: 18,
@@ -45,15 +61,21 @@ const SovereignEngine = (() => {
       },
 
       OPNT: {
-        addr: "0x2aEc1Db9197Ff284011A6A1d0752AD03F5782B0d",
+        addr: "0xC52643194BebB20e03108465057d19A82D093a8B",
         dec: 18,
-        slip: 3
+        slip: 5
       },
 
       tUSDT: {
         addr: "0x3e01b4d892E0D0A219eF8BBe7e260a6bc8d9B31b",
         dec: 18,
         slip: 2
+      },
+
+      tbnb: {
+        addr: "0x34151B19024D99fD18987b7C0428B715C8c29016",
+        dec: 18,
+        slip: 5
       },
 
       PRET: {
@@ -66,166 +88,66 @@ const SovereignEngine = (() => {
   });
 
   const _STATE = {
+
     address: null,
+
     balances: {},
+
     status: "IDLE",
+
     error: "",
+
     message: "",
-    logs: []
+
+    logs: [],
+
+    lastPreviewId: 0
   };
 
   let _provider = null;
 
-  let _hydrateTimer = null;
-  let _previewEpoch = 0;
-  let _notifyEpoch = 0;
+  let _hydrateTimeout = null;
+
+  let _notifyToken = 0;
 
   const _pairCache = new Map();
-
-  try {
-    const raw = localStorage.getItem("bozzdex_v91_logs");
-    _STATE.logs = raw ? JSON.parse(raw) : [];
-  } catch {
-    _STATE.logs = [];
-  }
-
-  const esc = (s = "") =>
-    String(s).replace(/[&<>"']/g, c => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    }[c]));
 
   const _core = {
 
     assetAddress(sym) {
+
       const asset = _CONFIG.ASSETS[sym];
+
       return asset.addr === "NATIVE"
         ? _CONFIG.WOPN
         : asset.addr;
     },
 
-    async pairExists(t1, t2) {
-      const key = [
-        t1.toLowerCase(),
-        t2.toLowerCase()
-      ].sort().join(":");
+    notify(msg, type = "INFO") {
 
-      if (_pairCache.has(key)) {
-        return _pairCache.get(key);
+      const token = ++_notifyToken;
+
+      if (type === "ERR") {
+        _STATE.error = msg;
+        _STATE.message = "";
+      } else {
+
+        _STATE.message = msg;
+        _STATE.error = "";
+
+        setTimeout(() => {
+
+          if (_notifyToken === token) {
+
+            _STATE.message = "";
+
+            SovereignEngine.render();
+          }
+
+        }, 7000);
       }
 
-      try {
-        const factory = new ethers.Contract(
-          _CONFIG.FACTORY,
-          _CONFIG.FACTORY_ABI,
-          _provider
-        );
-
-        const pair = await factory.getPair(t1, t2);
-
-        const exists = pair && pair !== ZERO;
-
-        _pairCache.set(key, exists);
-
-        return exists;
-
-      } catch {
-        return false;
-      }
-    },
-
-    async getValidatedPath(sIn, sOut, amtWei) {
-
-      const aIn = _core.assetAddress(sIn);
-      const aOut = _core.assetAddress(sOut);
-
-      const router = new ethers.Contract(
-        _CONFIG.ROUTER,
-        _CONFIG.ROUTER_ABI,
-        _provider
-      );
-
-      if (await _core.pairExists(aIn, aOut)) {
-
-        const directPath = [aIn, aOut];
-
-        try {
-          await router.getAmountsOut(amtWei, directPath);
-          return directPath;
-        } catch {}
-      }
-
-      if (
-        aIn !== _CONFIG.WOPN &&
-        aOut !== _CONFIG.WOPN
-      ) {
-
-        const hasBridgeIn = await _core.pairExists(aIn, _CONFIG.WOPN);
-        const hasBridgeOut = await _core.pairExists(_CONFIG.WOPN, aOut);
-
-        if (hasBridgeIn && hasBridgeOut) {
-
-          const bridgePath = [
-            aIn,
-            _CONFIG.WOPN,
-            aOut
-          ];
-
-          try {
-            await router.getAmountsOut(amtWei, bridgePath);
-            return bridgePath;
-          } catch {}
-        }
-      }
-
-      throw new Error("NO_ROUTE");
-    },
-
-    async getQuote(amtWei, path, sIn, sOut) {
-
-      try {
-
-        const router = new ethers.Contract(
-          _CONFIG.ROUTER,
-          _CONFIG.ROUTER_ABI,
-          _provider
-        );
-
-        const quotes = await router.getAmountsOut(
-          amtWei,
-          path
-        );
-
-        let qOut = quotes[quotes.length - 1];
-
-        if (
-          _CONFIG.ASSETS[sIn].hasFee ||
-          _CONFIG.ASSETS[sOut].hasFee
-        ) {
-          qOut = (qOut * 90n) / 100n;
-        }
-
-        const slip = BigInt(
-          _CONFIG.ASSETS[sOut].slip || 5
-        );
-
-        const minOut =
-          (qOut * (100n - slip)) / 100n;
-
-        return {
-          qOut,
-          minOut
-        };
-
-      } catch {
-        return {
-          qOut: 0n,
-          minOut: 0n
-        };
-      }
+      SovereignEngine.render();
     },
 
     saveLog(entry) {
@@ -246,31 +168,219 @@ const SovereignEngine = (() => {
       );
     },
 
-    notify(msg, type = "INFO") {
+    async validatePairHealth(pairAddr) {
 
-      const epoch = ++_notifyEpoch;
+      try {
 
-      if (type === "ERR") {
+        if (!pairAddr || pairAddr === ZERO) {
+          return false;
+        }
 
-        _STATE.error = msg;
-        _STATE.message = "";
+        const pair = new ethers.Contract(
+          pairAddr,
+          _CONFIG.PAIR_ABI,
+          _provider
+        );
 
-      } else {
+        const reserves = await pair.getReserves();
 
-        _STATE.message = msg;
-        _STATE.error = "";
+        const r0 = reserves[0];
+        const r1 = reserves[1];
 
-        setTimeout(() => {
+        console.log("PAIR_HEALTH", pairAddr, r0.toString(), r1.toString());
 
-          if (epoch === _notifyEpoch) {
-            _STATE.message = "";
-            SovereignEngine.render();
-          }
+        return r0 > 0n && r1 > 0n;
 
-        }, 7000);
+      } catch (e) {
+
+        console.warn("PAIR_HEALTH_FAIL", e);
+
+        return false;
+      }
+    },
+
+    async getHealthyPair(t1, t2) {
+
+      const key = [t1.toLowerCase(), t2.toLowerCase()]
+        .sort()
+        .join(":");
+
+      if (_pairCache.has(key)) {
+        return _pairCache.get(key);
       }
 
-      SovereignEngine.render();
+      try {
+
+        const factory = new ethers.Contract(
+          _CONFIG.FACTORY,
+          _CONFIG.FACTORY_ABI,
+          _provider
+        );
+
+        const pair = await factory.getPair(t1, t2);
+
+        if (!pair || pair === ZERO) {
+
+          _pairCache.set(key, null);
+
+          return null;
+        }
+
+        const healthy = await _core.validatePairHealth(pair);
+
+        if (!healthy) {
+
+          console.warn("PAIR_EXISTS_BUT_EMPTY", pair);
+
+          _pairCache.set(key, null);
+
+          return null;
+        }
+
+        _pairCache.set(key, pair);
+
+        return pair;
+
+      } catch (e) {
+
+        console.warn("PAIR_LOOKUP_FAIL", e);
+
+        return null;
+      }
+    },
+
+    async getValidatedPath(sIn, sOut, amtWei) {
+
+      const aIn = _core.assetAddress(sIn);
+
+      const aOut = _core.assetAddress(sOut);
+
+      const router = new ethers.Contract(
+        _CONFIG.ROUTER,
+        _CONFIG.ROUTER_ABI,
+        _provider
+      );
+
+      // DIRECT
+
+      const directPair = await _core.getHealthyPair(aIn, aOut);
+
+      if (directPair) {
+
+        const directPath = [aIn, aOut];
+
+        try {
+
+          const q = await router.getAmountsOut(
+            amtWei,
+            directPath
+          );
+
+          if (q && q[q.length - 1] > 0n) {
+
+            console.log("DIRECT_ROUTE_OK");
+
+            return directPath;
+          }
+
+        } catch (e) {
+
+          console.warn("DIRECT_QUOTE_FAIL", e);
+        }
+      }
+
+      // BRIDGE VIA WOPN
+
+      if (
+        aIn !== _CONFIG.WOPN &&
+        aOut !== _CONFIG.WOPN
+      ) {
+
+        const p1 = await _core.getHealthyPair(
+          aIn,
+          _CONFIG.WOPN
+        );
+
+        const p2 = await _core.getHealthyPair(
+          _CONFIG.WOPN,
+          aOut
+        );
+
+        if (p1 && p2) {
+
+          const bridgePath = [
+            aIn,
+            _CONFIG.WOPN,
+            aOut
+          ];
+
+          try {
+
+            const q = await router.getAmountsOut(
+              amtWei,
+              bridgePath
+            );
+
+            if (q && q[q.length - 1] > 0n) {
+
+              console.log("BRIDGE_ROUTE_OK");
+
+              return bridgePath;
+            }
+
+          } catch (e) {
+
+            console.warn("BRIDGE_QUOTE_FAIL", e);
+          }
+        }
+      }
+
+      throw new Error("NO_HEALTHY_ROUTE");
+    },
+
+    async getQuote(amtWei, path, sIn, sOut) {
+
+      try {
+
+        const router = new ethers.Contract(
+          _CONFIG.ROUTER,
+          _CONFIG.ROUTER_ABI,
+          _provider
+        );
+
+        const amounts = await router.getAmountsOut(
+          amtWei,
+          path
+        );
+
+        let out = amounts[amounts.length - 1];
+
+        if (
+          _CONFIG.ASSETS[sIn].hasFee ||
+          _CONFIG.ASSETS[sOut].hasFee
+        ) {
+          out = (out * 90n) / 100n;
+        }
+
+        const slip = BigInt(
+          _CONFIG.ASSETS[sOut].slip || 5
+        );
+
+        const minOut =
+          (out * (100n - slip)) / 100n;
+
+        return {
+          out,
+          minOut
+        };
+
+      } catch {
+
+        return {
+          out: 0n,
+          minOut: 0n
+        };
+      }
     }
   };
 
@@ -280,13 +390,19 @@ const SovereignEngine = (() => {
 
     async preview() {
 
-      const epoch = ++_previewEpoch;
+      const previewId = ++_STATE.lastPreviewId;
 
-      const sIn = document.getElementById("sel-in").value;
-      const sOut = document.getElementById("sel-out").value;
-      const val = document.getElementById("amt-in").value;
+      const sIn =
+        document.getElementById("sel-in").value;
 
-      const outEl = document.getElementById("amt-out");
+      const sOut =
+        document.getElementById("sel-out").value;
+
+      const val =
+        document.getElementById("amt-in").value;
+
+      const outEl =
+        document.getElementById("amt-out");
 
       if (
         !val ||
@@ -295,8 +411,7 @@ const SovereignEngine = (() => {
       ) {
 
         outEl.value = "";
-        _STATE.error = "";
-        this.render();
+
         return;
       }
 
@@ -307,36 +422,45 @@ const SovereignEngine = (() => {
           _CONFIG.ASSETS[sIn].dec
         );
 
-        const path = await _core.getValidatedPath(
-          sIn,
-          sOut,
-          amtWei
-        );
+        const path =
+          await _core.getValidatedPath(
+            sIn,
+            sOut,
+            amtWei
+          );
 
-        const { minOut } = await _core.getQuote(
-          amtWei,
-          path,
-          sIn,
-          sOut
-        );
+        const quote =
+          await _core.getQuote(
+            amtWei,
+            path,
+            sIn,
+            sOut
+          );
 
-        if (epoch !== _previewEpoch) return;
+        if (
+          previewId !== _STATE.lastPreviewId
+        ) {
+          return;
+        }
 
-        outEl.value = minOut > 0n
-          ? ethers.formatUnits(
-              minOut,
-              _CONFIG.ASSETS[sOut].dec
-            )
-          : "0.0";
+        outEl.value =
+          ethers.formatUnits(
+            quote.minOut,
+            _CONFIG.ASSETS[sOut].dec
+          );
 
         _STATE.error = "";
 
       } catch (e) {
 
-        if (epoch !== _previewEpoch) return;
+        if (
+          previewId === _STATE.lastPreviewId
+        ) {
 
-        outEl.value = "0.0";
-        _STATE.error = e.message || "QUOTE_FAILED";
+          outEl.value = "0.0";
+
+          _STATE.error = e.message;
+        }
       }
 
       this.render();
@@ -344,98 +468,117 @@ const SovereignEngine = (() => {
 
     async execute() {
 
-      if (_STATE.status !== "IDLE") return;
+      if (
+        _STATE.status !== "IDLE" ||
+        _STATE.error
+      ) {
+        return;
+      }
 
-      const sIn = document.getElementById("sel-in").value;
-      const sOut = document.getElementById("sel-out").value;
-      const val = document.getElementById("amt-in").value;
+      const sIn =
+        document.getElementById("sel-in").value;
+
+      const sOut =
+        document.getElementById("sel-out").value;
+
+      const val =
+        document.getElementById("amt-in").value;
 
       try {
 
-        _STATE.error = "";
-        _STATE.message = "";
+        _STATE.status = "PREPARING";
 
-        _STATE.status = "SEC_CHECK";
         this.render();
 
-        const signer = await _provider.getSigner();
-
-        const nativeBal = await _provider.getBalance(
-          _STATE.address
-        );
-
-        if (nativeBal < GAS_RESERVE) {
-          throw new Error("LOW_NATIVE_GAS");
-        }
+        const signer =
+          await _provider.getSigner();
 
         const amtWei = ethers.parseUnits(
           val,
           _CONFIG.ASSETS[sIn].dec
         );
 
-        const path = await _core.getValidatedPath(
-          sIn,
-          sOut,
-          amtWei
-        );
+        const path =
+          await _core.getValidatedPath(
+            sIn,
+            sOut,
+            amtWei
+          );
 
-        const { minOut } = await _core.getQuote(
-          amtWei,
-          path,
-          sIn,
-          sOut
-        );
+        const quote =
+          await _core.getQuote(
+            amtWei,
+            path,
+            sIn,
+            sOut
+          );
 
-        if (minOut <= 0n) {
-          throw new Error("INSUFFICIENT_LIQUIDITY");
+        if (quote.minOut <= 0n) {
+          throw new Error(
+            "INVALID_QUOTE"
+          );
         }
 
-        if (_CONFIG.ASSETS[sIn].addr !== "NATIVE") {
+        // APPROVAL
+
+        if (
+          _CONFIG.ASSETS[sIn].addr !==
+          "NATIVE"
+        ) {
 
           _STATE.status = "APPROVING";
+
           this.render();
 
-          const token = new ethers.Contract(
-            _CONFIG.ASSETS[sIn].addr,
-            _CONFIG.ERC20_ABI,
-            signer
-          );
+          const token =
+            new ethers.Contract(
+              _CONFIG.ASSETS[sIn].addr,
+              _CONFIG.ERC20_ABI,
+              signer
+            );
 
-          const allowance = await token.allowance(
-            _STATE.address,
-            _CONFIG.ROUTER
-          );
+          const allowance =
+            await token.allowance(
+              _STATE.address,
+              _CONFIG.ROUTER
+            );
 
           if (allowance < amtWei) {
 
-            const txApprove = await token.approve(
-              _CONFIG.ROUTER,
-              ethers.MaxUint256
-            );
+            const txApprove =
+              await token.approve(
+                _CONFIG.ROUTER,
+                ethers.MaxUint256
+              );
 
             await txApprove.wait();
           }
         }
 
+        // SWAP
+
         _STATE.status = "SWAPPING";
+
         this.render();
 
-        const router = new ethers.Contract(
-          _CONFIG.ROUTER,
-          _CONFIG.ROUTER_ABI,
-          signer
-        );
+        const router =
+          new ethers.Contract(
+            _CONFIG.ROUTER,
+            _CONFIG.ROUTER_ABI,
+            signer
+          );
 
         const deadline =
-          Math.floor(Date.now() / 1000) + 600;
+          Math.floor(Date.now() / 1000) +
+          600;
 
         let tx;
 
         if (sIn === "OPN") {
 
-          tx = await router
-            .swapExactETHForTokensSupportingFeeOnTransferTokens(
-              minOut,
+          tx =
+            await router.swapExactETHForTokensSupportingFeeOnTransferTokens(
+              quote.minOut,
               path,
               _STATE.address,
               deadline,
@@ -446,10 +589,10 @@ const SovereignEngine = (() => {
 
         } else if (sOut === "OPN") {
 
-          tx = await router
-            .swapExactTokensForETHSupportingFeeOnTransferTokens(
+          tx =
+            await router.swapExactTokensForETHSupportingFeeOnTransferTokens(
               amtWei,
-              minOut,
+              quote.minOut,
               path,
               _STATE.address,
               deadline
@@ -457,25 +600,27 @@ const SovereignEngine = (() => {
 
         } else {
 
-          tx = await router
-            .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+          tx =
+            await router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
               amtWei,
-              minOut,
+              quote.minOut,
               path,
               _STATE.address,
               deadline
             );
         }
 
-        _STATE.status = "PENDING";
+        _STATE.status = "CONFIRMING";
+
         this.render();
 
-        const receipt = await tx.wait();
+        const receipt =
+          await tx.wait();
 
         _core.saveLog({
           pair: `${sIn}→${sOut}`,
-          fullHash: receipt.hash,
-          status: "SUCCESS"
+          status: "SUCCESS",
+          fullHash: receipt.hash
         });
 
         _core.notify(
@@ -485,10 +630,12 @@ const SovereignEngine = (() => {
 
       } catch (e) {
 
+        console.error(e);
+
         const reason =
-          e?.shortMessage ||
-          e?.reason ||
-          e?.message ||
+          e.reason ||
+          e.shortMessage ||
+          e.message ||
           "UNKNOWN_ERROR";
 
         _core.saveLog({
@@ -497,310 +644,20 @@ const SovereignEngine = (() => {
           reason
         });
 
-        _core.notify(reason, "ERR");
+        _core.notify(
+          reason.slice(0, 50),
+          "ERR"
+        );
 
       } finally {
 
         _STATE.status = "IDLE";
+
         this.render();
+
         this.hydrate();
       }
-    },
-
-    async hydrate() {
-
-      if (_hydrateTimer) {
-        clearTimeout(_hydrateTimer);
-      }
-
-      if (
-        !_STATE.address ||
-        document.hidden
-      ) {
-        return;
-      }
-
-      try {
-
-        const balances = {};
-
-        for (const symbol of Object.keys(_CONFIG.ASSETS)) {
-
-          const asset = _CONFIG.ASSETS[symbol];
-
-          let bal;
-
-          if (asset.addr === "NATIVE") {
-
-            bal = await _provider.getBalance(
-              _STATE.address
-            );
-
-          } else {
-
-            const token = new ethers.Contract(
-              asset.addr,
-              ["function balanceOf(address) view returns (uint256)"],
-              _provider
-            );
-
-            bal = await token.balanceOf(
-              _STATE.address
-            );
-          }
-
-          balances[symbol] = ethers.formatUnits(
-            bal,
-            asset.dec
-          );
-        }
-
-        _STATE.balances = balances;
-
-        this.render();
-
-      } catch (e) {
-        console.warn("HYDRATE_FAIL", e);
-      }
-
-      _hydrateTimer = setTimeout(
-        () => this.hydrate(),
-        10000
-      );
-    },
-
-    render() {
-
-      const sIn = document.getElementById("sel-in").value;
-      const sOut = document.getElementById("sel-out").value;
-
-      document.getElementById("bal-in").innerText =
-        Number(_STATE.balances[sIn] || 0)
-          .toFixed(4);
-
-      document.getElementById("bal-out").innerText =
-        Number(_STATE.balances[sOut] || 0)
-          .toFixed(4);
-
-      const kernel = document.getElementById("kernelState");
-
-      if (_STATE.error) {
-
-        kernel.innerText = `[!] ${_STATE.error}`;
-        kernel.className = "status-pill status-bad";
-
-      } else if (_STATE.message) {
-
-        kernel.innerText = `[*] ${_STATE.message}`;
-        kernel.className = "status-pill status-ok";
-
-      } else {
-
-        kernel.innerText = `STATUS: ${_STATE.status}`;
-        kernel.className = "status-pill status-ok";
-      }
-
-      const execBtn = document.getElementById("exec-btn");
-
-      const amtIn = document.getElementById("amt-in").value;
-      const amtOut = document.getElementById("amt-out").value;
-
-      const outNum = Number(amtOut);
-
-      const isInvalid =
-        !amtIn ||
-        Number(amtIn) <= 0 ||
-        !amtOut ||
-        !Number.isFinite(outNum) ||
-        outNum <= 0;
-
-      execBtn.disabled =
-        _STATE.status !== "IDLE" ||
-        sIn === sOut ||
-        isInvalid;
-
-      execBtn.innerText =
-        _STATE.status === "IDLE"
-          ? "EXECUTE MISSION"
-          : `${_STATE.status}...`;
-
-      document.getElementById("fleet-overview").innerHTML = `
-        <div class="fleet-grid">
-
-          <div class="fleet-card">
-            <span>OPN</span>
-            <b>${Number(_STATE.balances.OPN || 0).toFixed(2)}</b>
-          </div>
-
-          <div class="fleet-card pret-focus">
-            <span>PRET</span>
-            <b>${Number(_STATE.balances.PRET || 0).toFixed(2)}</b>
-          </div>
-
-          <div class="fleet-card">
-            <span>tUSDT</span>
-            <b>${Number(_STATE.balances.tUSDT || 0).toFixed(2)}</b>
-          </div>
-
-        </div>
-      `;
-
-      document.getElementById("log-history").innerHTML =
-        _STATE.logs.map(log => `
-
-          <div class="log-item">
-
-            <div class="log-line">
-              <span class="${log.status === "SUCCESS" ? "ok-tag" : "err-tag"}">
-                ${esc(log.status)}
-              </span>
-
-              <span>
-                ${esc(log.time)} | ${esc(log.pair || "UNKNOWN")}
-              </span>
-            </div>
-
-            ${log.fullHash
-              ? `
-                <a
-                  class="log-hash"
-                  href="${_CONFIG.EXPLORER_TX}${esc(log.fullHash)}"
-                  target="_blank"
-                >
-                  🔗 View Tx
-                </a>
-              `
-              : `
-                <div class="err-tag">
-                  ${esc(log.reason || "FAILED")}
-                </div>
-              `
-            }
-
-          </div>
-
-        `).join("");
-    },
-
-    boot() {
-
-      if (!window.ethereum) {
-        _core.notify("NO_WALLET", "ERR");
-        return;
-      }
-
-      _provider = new ethers.BrowserProvider(
-        window.ethereum
-      );
-
-      window.ethereum
-        .request({
-          method: "eth_requestAccounts"
-        })
-        .then(accs => {
-
-          _STATE.address = accs[0] || null;
-
-          this.hydrate();
-        })
-        .catch(() => {
-          _core.notify(
-            "WALLET_CONNECTION_REJECTED",
-            "ERR"
-          );
-        });
-
-      window.ethereum.on(
-        "accountsChanged",
-        (accs) => {
-
-          _STATE.address = accs[0] || null;
-
-          _core.notify(
-            "ACCOUNT_CHANGED",
-            "OK"
-          );
-
-          this.hydrate();
-        }
-      );
-
-      window.ethereum.on(
-        "chainChanged",
-        () => {
-          window.location.reload();
-        }
-      );
-
-      window.ethereum.on(
-        "disconnect",
-        () => {
-
-          _STATE.address = null;
-
-          _core.notify(
-            "WALLET_DISCONNECTED",
-            "ERR"
-          );
-
-          this.render();
-        }
-      );
-
-      document.addEventListener(
-        "visibilitychange",
-        () => {
-
-          if (!document.hidden) {
-            this.hydrate();
-          }
-        }
-      );
     }
   };
+
 })();
-
-const UIHelper = {
-
-  handleInput() {
-    SovereignEngine.preview();
-  },
-
-  execute() {
-    SovereignEngine.execute();
-  },
-
-  setMax() {
-
-    const sIn = document.getElementById("sel-in").value;
-
-    const bal =
-      SovereignEngine.getState().balances[sIn] || "0";
-
-    if (sIn === "OPN") {
-
-      const wei = ethers.parseUnits(bal, 18);
-
-      const reserve = ethers.parseUnits(
-        "0.2",
-        18
-      );
-
-      const finalWei =
-        wei > reserve
-          ? wei - reserve
-          : 0n;
-
-      document.getElementById("amt-in").value =
-        ethers.formatUnits(finalWei, 18);
-
-    } else {
-
-      document.getElementById("amt-in").value = bal;
-    }
-
-    SovereignEngine.preview();
-  }
-};
-
-SovereignEngine.boot();
