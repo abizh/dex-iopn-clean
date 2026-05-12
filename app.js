@@ -1,6 +1,6 @@
 /**
- * SOVEREIGN ENGINE v91.0 - THE MAP READER
- * Core Logic for iOPN Testnet DEX integration
+ * SOVEREIGN ENGINE v91.2 - THE SENTINEL REBUILT
+ * Optimized for iOPN Testnet DEX integration & Revyl Testing
  */
 
 const SovereignEngine = (() => {
@@ -33,11 +33,6 @@ const SovereignEngine = (() => {
   };
 
   let _provider = null;
-  let _hydrateEpoch = 0;
-  let _notifyToken = 0;
-  let _consecutiveFails = 0;
-  let _pollTimeout = null;
-  let _isDeepSleeping = false;
   const _pairCache = new Map();
 
   // Load Persisted Logs
@@ -47,8 +42,6 @@ const SovereignEngine = (() => {
   } catch { _STATE.logs = []; }
 
   const _core = {
-    stopPolling() { if (_pollTimeout) clearTimeout(_pollTimeout); _pollTimeout = null; },
-
     assetAddress(sym) {
       const a = _CONFIG.ASSETS[sym];
       return a.addr === "NATIVE" ? _CONFIG.WOPN : a.addr;
@@ -71,27 +64,27 @@ const SovereignEngine = (() => {
       const aOut = _core.assetAddress(sOut);
       const router = new ethers.Contract(_CONFIG.ROUTER, _CONFIG.ROUTER_ABI, _provider);
 
-      // Check Direct
       if (await _core.pairExists(aIn, aOut)) {
         try { await router.getAmountsOut(amtWei, [aIn, aOut]); return [aIn, aOut]; } catch {}
       }
-      // Check Bridge via WOPN
       if (aIn !== _CONFIG.WOPN && aOut !== _CONFIG.WOPN) {
         if (await _core.pairExists(aIn, _CONFIG.WOPN) && await _core.pairExists(_CONFIG.WOPN, aOut)) {
           try { await router.getAmountsOut(amtWei, [aIn, _CONFIG.WOPN, aOut]); return [aIn, _CONFIG.WOPN, aOut]; } catch {}
         }
       }
-      throw new Error("NO_VALID_ROUTE_ON_MAP");
+      throw new Error("NO_ROUTE");
     },
 
     async getQuote(amtWei, path, sIn, sOut) {
-      const router = new ethers.Contract(_CONFIG.ROUTER, _CONFIG.ROUTER_ABI, _provider);
-      const quotes = await router.getAmountsOut(amtWei, path);
-      let qOut = quotes[quotes.length - 1];
-      if (_CONFIG.ASSETS[sIn].hasFee || _CONFIG.ASSETS[sOut].hasFee) qOut = (qOut * 92n) / 100n;
-      const slip = BigInt(_CONFIG.ASSETS[sOut].slip || 5);
-      const minOut = (qOut * (100n - slip)) / 100n;
-      return { qOut, minOut };
+      try {
+        const router = new ethers.Contract(_CONFIG.ROUTER, _CONFIG.ROUTER_ABI, _provider);
+        const quotes = await router.getAmountsOut(amtWei, path);
+        let qOut = quotes[quotes.length - 1];
+        if (_CONFIG.ASSETS[sIn].hasFee || _CONFIG.ASSETS[sOut].hasFee) qOut = (qOut * 90n) / 100n;
+        const slip = BigInt(_CONFIG.ASSETS[sOut].slip || 5);
+        const minOut = (qOut * (100n - slip)) / 100n;
+        return { qOut, minOut };
+      } catch { return { qOut: 0n, minOut: 0n }; }
     },
 
     saveLog(entry) {
@@ -101,34 +94,31 @@ const SovereignEngine = (() => {
     },
 
     notify(msg, type = "INFO") {
-      const token = ++_notifyToken;
       if (type === "ERR") { _STATE.error = msg; _STATE.message = ""; }
       else { _STATE.message = msg; _STATE.error = ""; }
       SovereignEngine.render();
-      if (type !== "ERR") setTimeout(() => { if (_notifyToken === token) { _STATE.message = ""; SovereignEngine.render(); } }, 7000);
     }
   };
 
   return {
     getState: () => _STATE,
     async preview() {
-      if (!_STATE.address || document.hidden) return;
       const sIn = document.getElementById("sel-in").value;
       const sOut = document.getElementById("sel-out").value;
       const val = document.getElementById("amt-in").value;
       const outEl = document.getElementById("amt-out");
-      if (!val || val <= 0 || sIn === sOut) { outEl.value = ""; return; }
+      if (!val || val <= 0 || sIn === sOut) { outEl.value = ""; this.render(); return; }
       try {
         const amtWei = ethers.parseUnits(val, _CONFIG.ASSETS[sIn].dec);
         const path = await _core.getValidatedPath(sIn, sOut, amtWei);
         const { minOut } = await _core.getQuote(amtWei, path, sIn, sOut);
-        outEl.value = ethers.formatUnits(minOut, _CONFIG.ASSETS[sOut].dec);
-      } catch { outEl.value = ""; }
+        outEl.value = minOut > 0n ? ethers.formatUnits(minOut, _CONFIG.ASSETS[sOut].dec) : "0.0";
+      } catch { outEl.value = "0.0"; }
+      this.render();
     },
 
     async hydrate() {
-      if (!_STATE.address || _isDeepSleeping) return;
-      const epoch = ++_hydrateEpoch;
+      if (!_STATE.address) return;
       try {
         const res = {};
         for (const s of Object.keys(_CONFIG.ASSETS)) {
@@ -138,31 +128,31 @@ const SovereignEngine = (() => {
           else bal = await (new ethers.Contract(asset.addr, ["function balanceOf(address) view returns (uint256)"], _provider)).balanceOf(_STATE.address);
           res[s] = ethers.formatUnits(bal, asset.dec);
         }
-        if (epoch === _hydrateEpoch) { _STATE.balances = res; _consecutiveFails = 0; this.render(); }
-      } catch { _consecutiveFails++; }
-      setTimeout(() => this.hydrate(), _consecutiveFails > 2 ? 30000 : 7000);
+        _STATE.balances = res; this.render();
+      } catch (e) { console.error("Hydrate Error", e); }
+      setTimeout(() => this.hydrate(), 10000);
     },
 
     render() {
-      // Element Mapping
       const sIn = document.getElementById("sel-in").value;
       const sOut = document.getElementById("sel-out").value;
+      const amtIn = document.getElementById("amt-in").value;
+      const amtOut = document.getElementById("amt-out").value;
+
       document.getElementById("bal-in").innerText = parseFloat(_STATE.balances[sIn] || 0).toFixed(4);
       document.getElementById("bal-out").innerText = parseFloat(_STATE.balances[sOut] || 0).toFixed(4);
-      
+
       const kernel = document.getElementById("kernelState");
       if (_STATE.error) { kernel.innerText = `[!] ${_STATE.error}`; kernel.className = "status-pill status-bad"; }
       else if (_STATE.message) { kernel.innerText = `[*] ${_STATE.message}`; kernel.className = "status-pill status-ok"; }
       else { kernel.innerText = `STATUS: ${_STATE.status}`; kernel.className = "status-pill status-ok"; }
 
       const execBtn = document.getElementById("exec-btn");
-      execBtn.disabled = (_STATE.status !== "IDLE" || sIn === sOut);
+      const isInvalid = !amtIn || parseFloat(amtIn) <= 0 || !amtOut || parseFloat(amtOut) <= 0;
+      execBtn.disabled = (_STATE.status !== "IDLE" || sIn === sOut || isInvalid);
       execBtn.innerText = _STATE.status === "IDLE" ? "EXECUTE MISSION" : `${_STATE.status}...`;
 
-      // Fleet & Logs
-      const intel = _STATE.logs.length ? { health: "OK", hb: _STATE.logs[0].time } : { health: "IDLE", hb: "NONE" };
       document.getElementById("fleet-overview").innerHTML = `
-        <div class="fleet-bar"><span>● ${intel.health}</span><span>HB: ${intel.hb}</span></div>
         <div class="fleet-grid">
           <div class="fleet-card"><span>OPN</span><b>${parseFloat(_STATE.balances.OPN || 0).toFixed(2)}</b></div>
           <div class="fleet-card pret-focus"><span>PRET</span><b>${parseFloat(_STATE.balances.PRET || 0).toFixed(2)}</b></div>
@@ -171,14 +161,12 @@ const SovereignEngine = (() => {
       `;
 
       document.getElementById("log-history").innerHTML = _STATE.logs.map(l => `
-        <div class="log-item ${l.status === 'FAILED' ? 'failed' : ''}">
-          <div class="log-meta">
-            <div class="log-line">
-              <span class="${l.status === 'SUCCESS' ? 'ok-tag' : 'err-tag'}">${l.status}</span>
-              <span>${l.time} | ${l.pair}</span>
-            </div>
-            ${l.fullHash ? `<a class="log-hash" href="${_CONFIG.EXPLORER_TX}${l.fullHash}" target="_blank">🔗 ${l.fullHash.slice(0,12)}...</a>` : `<span class="warn-tag">${l.reason || ''}</span>`}
+        <div class="log-item">
+          <div class="log-line">
+            <span class="${l.status === 'SUCCESS' ? 'ok-tag' : 'err-tag'}">${l.status}</span>
+            <span>${l.time} | ${l.pair}</span>
           </div>
+          ${l.fullHash ? `<a class="log-hash" href="${_CONFIG.EXPLORER_TX}${l.fullHash}" target="_blank">🔗 View Tx</a>` : ''}
         </div>
       `).join("");
     },
@@ -189,11 +177,13 @@ const SovereignEngine = (() => {
       const sOut = document.getElementById("sel-out").value;
       const val = document.getElementById("amt-in").value;
       try {
-        _STATE.status = "ROUTING"; this.render();
+        _STATE.status = "INITIATING"; this.render();
         const signer = await _provider.getSigner();
         const amtWei = ethers.parseUnits(val, _CONFIG.ASSETS[sIn].dec);
         const path = await _core.getValidatedPath(sIn, sOut, amtWei);
         const { minOut } = await _core.getQuote(amtWei, path, sIn, sOut);
+
+        if (minOut === 0n) throw new Error("INSUFFICIENT_LIQUIDITY");
 
         if (_CONFIG.ASSETS[sIn].addr !== "NATIVE") {
           _STATE.status = "APPROVING"; this.render();
@@ -209,7 +199,6 @@ const SovereignEngine = (() => {
         else if (sOut === "OPN") tx = await router.swapExactTokensForETHSupportingFeeOnTransferTokens(amtWei, minOut, path, _STATE.address, deadline);
         else tx = await router.swapExactTokensForTokensSupportingFeeOnTransferTokens(amtWei, minOut, path, _STATE.address, deadline);
 
-        _STATE.status = "PENDING"; this.render();
         const receipt = await tx.wait();
         _core.saveLog({ pair: `${sIn}→${sOut}`, fullHash: receipt.hash, status: "SUCCESS" });
         _core.notify("MISSION SUCCESS", "OK");
@@ -226,7 +215,6 @@ const SovereignEngine = (() => {
         _STATE.address = accs[0];
         this.hydrate();
       });
-      document.addEventListener("visibilitychange", () => { _isDeepSleeping = document.hidden; if(!_isDeepSleeping) this.hydrate(); });
     }
   };
 })();
@@ -237,7 +225,7 @@ const UIHelper = {
   setMax: async () => {
     const sIn = document.getElementById("sel-in").value;
     const bal = SovereignEngine.getState().balances[sIn] || 0;
-    document.getElementById("amt-in").value = sIn === "OPN" ? Math.max(0, bal - 0.5) : bal;
+    document.getElementById("amt-in").value = sIn === "OPN" ? Math.max(0, bal - 0.2).toString() : bal;
     SovereignEngine.preview();
   }
 };

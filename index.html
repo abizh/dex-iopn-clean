@@ -3,65 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SOVEREIGN SENTINEL v91.0</title>
+  <title>SOVEREIGN SENTINEL v91.2</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
   <style>
-    :root {
-      --bg: #050505; --card: #0f0f0f; --panel: #0b0b0b;
-      --accent: #00ff88; --warn: #ffcc00; --err: #ff4444;
-      --text: #ececec; --muted: #666; --border: #222;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; padding: 20px; background: var(--bg);
-      color: var(--text); font-family: "Segoe UI", sans-serif;
-      display: flex; justify-content: center;
-    }
-    .cockpit {
-      width: 100%; max-width: 520px; background: var(--card);
-      border: 1px solid var(--border); border-radius: 14px;
-      padding: 18px; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-    }
-    .title {
-      text-align: center; font-weight: 900; letter-spacing: 1.5px;
-      margin: 4px 0 14px; color: var(--accent); text-transform: uppercase;
-    }
-    #fleet-overview {
-      background: var(--panel); border: 1px solid #181818;
-      border-radius: 10px; padding: 12px; margin-bottom: 16px;
-      font-family: "Courier New", monospace;
-    }
-    .fleet-bar { display: flex; justify-content: space-between; font-size: 0.72rem; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid #1d1d1d; }
-    .fleet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .fleet-card { background: #101010; border: 1px solid #202020; border-left: 2px solid #444; border-radius: 8px; padding: 8px; }
-    .fleet-card.pret-focus { border-left-color: var(--warn); background: linear-gradient(135deg, #101010 0%, #1b1503 100%); }
-    .fleet-card span { display: block; font-size: 0.62rem; color: #888; margin-bottom: 4px; text-transform: uppercase; }
-    .fleet-card b { font-size: 0.95rem; color: #fff; }
-    .field { margin-bottom: 14px; }
-    label { display: block; font-size: 0.72rem; color: #8a8a8a; margin-bottom: 6px; text-transform: uppercase; }
-    select, input { width: 100%; background: #171717; color: #fff; border: 1px solid #2b2b2b; padding: 12px; border-radius: 8px; outline: none; font-size: 1rem; }
-    input:focus, select:focus { border-color: var(--accent); }
+    :root { --bg: #050505; --card: #0f0f0f; --accent: #00ff88; --err: #ff4444; --border: #222; }
+    body { margin: 0; padding: 20px; background: var(--bg); color: #ececec; font-family: "Segoe UI", sans-serif; display: flex; justify-content: center; }
+    .cockpit { width: 100%; max-width: 480px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .title { text-align: center; font-weight: 900; color: var(--accent); text-transform: uppercase; margin-bottom: 20px; font-size: 1.2rem; }
+    .fleet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+    .fleet-card { background: #111; border: 1px solid #222; border-radius: 8px; padding: 10px; text-align: center; }
+    .fleet-card span { display: block; font-size: 0.65rem; color: #888; }
+    .fleet-card b { font-size: 1rem; color: #fff; }
+    .pret-focus { border-top: 2px solid #ffcc00; }
+    .field { margin-bottom: 15px; }
+    label { font-size: 0.7rem; color: #888; text-transform: uppercase; margin-bottom: 5px; display: block; }
+    select, input { width: 100%; background: #181818; color: #fff; border: 1px solid #333; padding: 12px; border-radius: 8px; outline: none; }
+    input:focus { border-color: var(--accent); }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .btn-exec, .btn-mini { width: 100%; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; transition: 0.2s ease; }
-    .btn-exec { padding: 14px; background: var(--accent); color: #000; text-transform: uppercase; margin-top: 8px; }
-    .btn-exec:disabled { background: #2d2d2d; color: #666; cursor: not-allowed; }
-    .btn-mini { padding: 8px 10px; margin-top: 8px; background: #1e1e1e; color: #eaeaea; border: 1px solid #2c2c2c; font-size: 0.76rem; }
-    .status-pill { margin-top: 14px; padding: 10px; border-radius: 8px; font-family: "Courier New", monospace; text-align: center; border: 1px solid #2a2a2a; word-break: break-word; }
-    .status-ok { background: rgba(0,255,136,0.08); color: var(--accent); border-color: rgba(0,255,136,0.18); }
-    .status-bad { background: rgba(255,68,68,0.08); color: var(--err); border-color: rgba(255,68,68,0.18); }
-    #log-history { margin-top: 16px; max-height: 220px; overflow-y: auto; border-top: 1px solid #1e1e1e; padding-top: 12px; font-family: "Courier New", monospace; font-size: 0.75rem; }
-    .log-item { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid #121212; align-items: center; }
-    .ok-tag { color: var(--accent); font-weight: 900; }
-    .err-tag { color: var(--err); font-weight: 900; }
-    .warn-tag { color: var(--warn); font-weight: 900; }
-    .log-hash { color: #7a7a7a; text-decoration: none; }
+    .btn-exec { width: 100%; padding: 15px; background: var(--accent); color: #000; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; margin-top: 10px; }
+    .btn-exec:disabled { background: #222; color: #555; cursor: not-allowed; }
+    .btn-mini { background: #222; color: #ccc; border: 1px solid #333; padding: 5px 10px; border-radius: 4px; font-size: 0.7rem; cursor: pointer; margin-top: 5px; }
+    .status-pill { margin-top: 15px; padding: 10px; border-radius: 8px; text-align: center; font-family: monospace; font-size: 0.8rem; }
+    .status-ok { background: rgba(0,255,136,0.1); color: var(--accent); }
+    .status-bad { background: rgba(255,68,68,0.1); color: var(--err); }
+    #log-history { margin-top: 20px; border-top: 1px solid #222; padding-top: 10px; font-family: monospace; font-size: 0.75rem; max-height: 150px; overflow-y: auto; }
+    .log-item { padding: 5px 0; border-bottom: 1px solid #111; }
+    .ok-tag { color: var(--accent); }
+    .err-tag { color: var(--err); }
+    .log-hash { color: #555; text-decoration: none; margin-left: 10px; }
   </style>
 </head>
 <body>
   <div class="cockpit">
-    <div class="title">Sovereign Sentinel v91.0</div>
+    <div class="title">Sovereign Sentinel v91.2</div>
     <div id="fleet-overview"></div>
-
     <div class="field">
       <label>Input Asset</label>
       <div class="row">
@@ -80,26 +55,22 @@
           <option value="tUSDT">tUSDT</option>
         </select>
       </div>
-      <div style="font-size:0.76rem; color:#777; margin-top:5px;">AVAILABLE: <span id="bal-in">0.0000</span></div>
+      <div style="font-size:0.7rem; color:#666; margin-top:4px;">AVAILABLE: <span id="bal-in">0.0000</span></div>
     </div>
-
     <div class="field">
       <label>Amount In</label>
       <input id="amt-in" type="number" step="any" placeholder="0.0" oninput="UIHelper.handleInput()" />
       <button class="btn-mini" onclick="UIHelper.setMax()">MAX SALDO</button>
     </div>
-
     <div class="field">
-      <label>Estimated Out</label>
+      <label>Estimated Out (Min)</label>
       <input id="amt-out" type="text" readonly placeholder="0.0" />
-      <div style="font-size:0.76rem; color:#777; margin-top:5px;">BALANCE: <span id="bal-out">0.0000</span></div>
+      <div style="font-size:0.7rem; color:#666; margin-top:4px;">BALANCE: <span id="bal-out">0.0000</span></div>
     </div>
-
-    <button id="exec-btn" class="btn-exec" onclick="UIHelper.execute()">EXECUTE MISSION</button>
+    <button id="exec-btn" class="btn-exec" onclick="UIHelper.execute()" disabled>EXECUTE MISSION</button>
     <div id="kernelState" class="status-pill status-ok">SYSTEM IDLE</div>
     <div id="log-history"></div>
   </div>
-
   <script src="app.js"></script>
 </body>
 </html>
